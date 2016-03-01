@@ -1,0 +1,35 @@
+environment:
+    .../environment_parameters.ini
+
+default:
+    .../default_parameters.ini
+
+project:
+    .../<project>/parameters.ini
+
+process:
+    .../<project>/<process>_parameters.ini
+
+default section:
+    [DEFAULT] section inside .../<project>/<process>_parameters.ini
+
+section:
+    [<section>] section inside .../<project>/<process>_parameters.ini
+
+
+
+
+
+Use cases:
+    * We want to change a single parameter and have all our processes instantly updated. We don't want a default hierarchy. Solution: environment parameter
+    * We want to provide a default value shared across all our projects and processes, which can be overridden at any level. Solution: default parameter
+    * We want to provide a default value shared across all processes within a particular project, which can then be overridden at the process level. Solution: project parameter
+    * We want to provide a value for a particular process. Solution: process parameter
+
+
+
+Implementation:
+    * Two ways to load parameters: environment parameters and defaulted parameters.
+    * Environment parameters are always loaded from the same file. No defaulting or overriding takes place.
+    * Defaulted parameters are loaded from the most specific location possible, with default values specified at the next level up in the hierarchy.
+    * Environment parameters can control the root location of the default hierarchy.
