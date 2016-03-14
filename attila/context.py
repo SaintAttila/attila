@@ -1,28 +1,9 @@
-# TODO: The documentation for Activity is obsolete...
 """
 attila.tracking
 ===============
 
-Automation time/activity tracking
+Automation time/activity tracking.
 
-Using Activity:
-    Code example:
-        with Activity("Doing stuff..."):
-            print("Now I'm doing stuff.")
-
-            with Activity("Doing more detailed stuff..."):
-                print("This is getting complicated.")
-
-    If and when an error occurs, the nested tasks that were failed will be
-    automatically logged. If you would like to also log when code blocks are
-    entered and exited successfully, do this at the top of your script:
-
-        Activity.bLogEnter = True
-        Activity.bLogExit = True
-
-    This is handy for testing and debugging, when more in-depth logging is
-    needed, since a lot of normally unnecessary logging can be turned on/off
-    with a single switch.
 """
 
 
@@ -69,8 +50,28 @@ class Tracker:
 
 
 class Activity:
-    """Use with the 'with' statement to automatically track what activity is
-    being performed. Use logging flags to control what events are logged."""
+    """
+    Use with the 'with' statement to automatically track what activity is being performed. Use logging flags to
+    control what events are logged.
+
+    Example Usage:
+        with Activity("Doing stuff..."):
+            print("Now I'm doing stuff.")
+
+            with Activity("Doing more detailed stuff..."):
+                print("This is getting complicated.")
+
+    If and when an error occurs, the nested tasks that were failed will be automatically logged. Logging also takes
+    place automatically when the with block is entered and exited cleanly. The default log levels can be set at the
+    class level:
+
+        Activity.enter_log_level = logging.DEBUG
+        Activity.exit_log_level = logging.INFO
+        Activity.error_log_level = logging.CRITICAL
+
+    This is handy for testing and debugging, when more in-depth logging is needed, since a lot of normally unnecessary
+    logging can be turned on/off with a single switch.
+    """
 
     # Defaults for all class instances:
     enter_log_level = logging.INFO
