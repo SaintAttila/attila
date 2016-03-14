@@ -2,9 +2,12 @@
 attila.utility
 ==============
 
-Utility functions.
+Utility functions. This module is the "miscellaneous bin", providing a home for simple functions and classes that don't
+really belong anywhere else.
 """
 
+
+import msvcrt
 import sys
 import time
 
@@ -203,3 +206,11 @@ def retry(function, timeout=None, attempts=None, interval=None, handler=None,
                 raise
 
         time.sleep(interval)  # Avoid eating unnecessary resources.
+
+
+def wait_for_keypress():
+    """
+    Waits for any keypress, checking every tenth of a second.
+    """
+    while not msvcrt.kbhit():
+        time.sleep(.1)
