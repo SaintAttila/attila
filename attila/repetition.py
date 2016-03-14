@@ -8,8 +8,6 @@ Functions for conditionally repeating tasks.
 import sys
 import time
 
-__author__ = 'Aaron Hosford'
-
 
 def wait_for(condition, timeout=None, attempts=None, interval=None, raise_error=False, ignore_errors=True,
              args=None, kwargs=None):
