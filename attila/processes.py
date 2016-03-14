@@ -6,62 +6,172 @@ Tools for controlling and interacting with Windows processes.
 """
 
 
-import sys
-import threading
-import traceback
+import time
 
-import pythoncom
-
-from win32com.client import GetObject
+import pywintypes
+import win32api
+import win32com.client
+import win32con
 
 
 from attila.utility import only, TooFewItemsError
 
 
 __all__ = [
-    "get_processes",
-    "kill_processes",
-    "capture_process",
-    "KillProcessTimer",
+    "process_exists",
+    "count_processes",
+    "get_pids",
+    "get_name",
+    "get_parent_pid",
+    "get_child_pids",
+    "kill_process",
+    "kill_process_family",
+    "capture_process"
 ]
 
 
-def get_processes(pid=None, name=None):
+def process_exists(pid=None, name=None):
     """
-    Scan the list of running processes for any with the given PID and name. Return a list containing a WMI process
-    object for each such process. Note that process name is case sensitive. Will return all running processes if None is
-    provided for both fields.
+    Return a Boolean indicating whether a process exists.
 
-    :param pid: The process ID, an integer.
+    :param pid: The process ID.
     :param name: The process name.
-    :return: A list of processes.
+    :return: Whether the indicated process exists.
     """
-    return [
-        process
-        for process in GetObject('winmgmts:').InstancesOf('Win32_Process')
+
+    return count_processes(pid, name) > 0
+
+
+def count_processes(pid=None, name=None):
+    """
+    Count the number of active processes. If a process ID or process name is provided, count only processes that match
+    the requirements.
+
+    :param pid: The process ID of the process.
+    :param name: The name of the process.
+    :return: The number of processes identified.
+    """
+    counter = 0
+    for process in win32com.client.GetObject('winmgmts:').InstancesOf('Win32_Process'):
         if ((pid is None or process.Properties_("ProcessID").Value == pid) and
-            (name is None or process.Properties_("Name").Value == name))
-    ]
+                (name is None or process.Properties_("Name").Value == name)):
+            counter += 1
+    return counter
 
 
-def kill_processes(pid=None, name=None):
+def get_pids(name=None):
     """
-    Kill all processes matching the given PID and process name. Note that process name is case sensitive.
+    Return a list of process IDs of active processes.
 
-    :param pid: The process ID, an integer.
-    :param name: The process name.
-    :return: The number of terminated processes.
+    :param name: The name of the processes.
+    :return: The PIDs of the processes.
     """
-    if pid is None and name is None:
-        raise ValueError("Either pid or name must be provided.")
+    results = []
+    for process in win32com.client.GetObject('winmgmts:').InstancesOf('Win32_Process'):
+        if name is None or process.Properties_("Name").Value == name:
+            results.append(process.Properties_("ProcessID").Value)
+    return results
 
-    processes = get_processes(pid, name)
-    for process in processes:
-        # It's a property, not a method, but accessing its value kills the process. Thanks, Microsoft. :-\
-        # noinspection PyStatementEffect
-        process.Terminate
 
-    return len(processes)
+def get_name(pid, default=None):
+    """
+    Return the name of the process if it exists, or the default otherwise.
+
+    :param pid: The process ID.
+    :param default: The default value to return if the process does not exist.
+    :return: The name of the process.
+    """
+    try:
+        return only(process.Properties_("Name").Value
+                    for process in win32com.client.GetObject('winmgmts:').InstancesOf('Win32_Process')
+                    if process.Properties_("ProcessID").Value == pid)
+    except TooFewItemsError:
+        return default
+
+
+def get_parent_pid(pid):
+    """
+    Return the process ID of the parent process. If no parent, return None.
+
+    :param pid: The process ID of the child process.
+    :return: The process ID of the parent process, or None.
+    """
+
+    wmi = win32com.client.GetObject('winmgmts:')
+    parent_pids = wmi.ExecQuery('SELECT ParentProcessID FROM Win32_Process WHERE ProcessID=%s' % pid)
+    assert len(parent_pids) <= 1
+    if not parent_pids:
+        return None
+    return parent_pids[0].Properties_('ParentProcessID').Value
+
+
+def get_child_pids(pid):
+    """
+    Return the process IDs of the child processes in a list.
+
+    :param pid: The process ID of the parent process.
+    :return: A list of the child process IDs.
+    """
+
+    wmi = win32com.client.GetObject('winmgmts:')
+    children = wmi.ExecQuery('SELECT * FROM Win32_Process WHERE ParentProcessID = %s' % pid)
+    return [child.Properties_('ProcessId').Value for child in children]
+
+
+def kill_process(pid, exit_code=None):
+    """
+    Kill a specific process.
+
+    :param pid: The process ID of the process to be terminated.
+    :param exit_code: The exit code that the terminated process should return. (Default is 1413829197.)
+    :return: Whether the process was successfully terminated.
+    """
+
+    # Exit code can be any integer. I picked the binary representation of the
+    # string "TERM" as the default.
+    if exit_code is None:
+        exit_code = 1413829197
+
+    try:
+        handle = win32api.OpenProcess(win32con.PROCESS_TERMINATE, 0, pid)
+    except pywintypes.error:
+        return False  # "The parameter is incorrect."
+
+    if not handle:
+        return False
+
+    try:
+        win32api.TerminateProcess(handle, exit_code)
+        return True
+    except pywintypes.error:
+        return False  # "Access is denied."
+    finally:
+        win32api.CloseHandle(handle)
+
+
+def kill_process_family(pid, exit_code=None, timeout=None):
+    """
+    Kill a specific process and all descendant processes.
+
+    :param pid: The process ID of the root process to terminate.
+    :param exit_code: The exit code to be returned by each terminated process.
+    :param timeout: The maximum time in seconds to continue trying to kill the processes.
+    :return: None
+    """
+
+    if timeout is not None:
+        end_time = time.time() + timeout
+    else:
+        end_time = None
+    while True:
+        children = get_child_pids(pid)
+        if not children:
+            break
+        if end_time is not None and time.time() >= end_time:
+            raise TimeoutError("Unable to kill child processes.")
+        for child in children:
+            kill_process_family(child, exit_code)
+    kill_process(pid, exit_code)
 
 
 def capture_process(command, process_name=None, closer=None, args=None, kwargs=None):
@@ -87,10 +197,10 @@ def capture_process(command, process_name=None, closer=None, args=None, kwargs=N
     if kwargs is None:
         kwargs = {}
 
-    wmi = GetObject('winmgmts:')
+    wmi = win32com.client.GetObject('winmgmts:')
 
     before = {
-        process.Properties_("ProcessID").Value : process
+        process.Properties_("ProcessID").Value: process
         for process in wmi.InstancesOf('Win32_Process')
         if (process_name is None or process.Properties_("Name").Value == process_name)
     }
@@ -98,7 +208,7 @@ def capture_process(command, process_name=None, closer=None, args=None, kwargs=N
     result = command(*args, **kwargs)
     try:
         after = {
-            process.Properties_("ProcessID").Value : process
+            process.Properties_("ProcessID").Value: process
             for process in wmi.InstancesOf('Win32_Process')
             if process.Properties_("Name").Value == process_name
         }
@@ -110,45 +220,3 @@ def capture_process(command, process_name=None, closer=None, args=None, kwargs=N
         if closer is not None:
             closer(result)
         raise
-
-
-class KillProcessTimer(threading.Timer):
-    """
-    This is a thread whose sole purpose is to kill another process after a set amount of time has passed. It's necessary
-    because sometimes Excel hangs and there is no other clean way to terminate the process.
-    """
-
-    def __init__(self, pid, name, timeout):
-        self.pid = pid
-        self.name = name
-        self.timeout = timeout
-        self.terminated = False
-        self.exception = None
-        self.traceback = None
-        self.exc_info = (None, None, None)
-
-        threading.Timer.__init__(self, timeout, self.kill_process)
-
-    def kill_process(self):
-        """
-        Called by the timer to kill the process after the timeout has expired.
-
-        :return: None
-        """
-        pythoncom.CoInitialize()
-        try:
-            try:
-                process = only(get_processes(self.pid, self.name))
-            except TooFewItemsError:
-                pass
-            else:
-                # It's a property, not a method, bu accessing its value kills the process.
-                # noinspection PyStatementEffect
-                process.Terminate
-                self.terminated = True
-        except Exception as exc:
-            self.exception = exc
-            self.traceback = traceback.format_exc()
-            self.exc_info = sys.exc_info()
-        finally:
-            pythoncom.CoUninitialize()
