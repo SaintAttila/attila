@@ -12,6 +12,8 @@ import time
 import traceback
 
 import pythoncom
+import win32con
+import win32event
 
 from ctypes import wintypes
 
@@ -23,6 +25,53 @@ __all__ = [
     "AsyncCall",
     "async",
 ]
+
+
+def wait_for_handle(handle, timeout=None):
+    """
+    Wait up to timeout seconds to acquire the handle. Return True if the handle was successfully acquired. Return False
+    if the handle was not acquired due to timeout.
+
+    This function is not just for mutexes. It works for a variety of resources. For more details see:
+    https://msdn.microsoft.com/en-us/library/windows/desktop/ms687032(v=vs.85).aspx
+
+    :param handle: The Windows object handle to acquire.
+    :param timeout: The maximum time in seconds to wait.
+    :return: Whether the handle was acquired.
+    """
+
+    if timeout is None:
+        # max int, never time out.
+        timeout_milliseconds = 0xFFFFFFFF
+    else:
+        # approximate max int, take minimum between the two
+        timeout_milliseconds = int(max(min(0xFFFFFFFE, timeout * 1000), 1))
+
+    # Return Values:
+    #   0 indicates the lock was already available or the other program released the handle intentionally.
+    #   0x80 indicates the other program released the handle when it exited
+    #   0x102 indicates the request timed out.
+    #   0xFFFFFFFF indicates the function failed, and we should call GetLastError() to see why.
+    #   Any other value indicates an error handling the request in Windows itself.
+    status = win32event.WaitForSingleObject(handle, timeout_milliseconds)
+
+    if status == win32con.WAIT_ABANDONED:  # AKA MUTEX_RELEASED_DUE_TO_PROGRAM_EXIT
+        # Mutex was acquired
+        return True
+    elif status == win32con.WAIT_OBJECT_0:  # AKA MUTEX_RELEASED_NORMALLY
+        # Mutex was acquired
+        return True
+    elif status == win32con.WAIT_TIMEOUT:  # AKA MUTEX_TIMED_OUT
+        # Request timed out
+        raise False
+    elif status == win32con.WAIT_FAILED:
+        # Something else went wrong. We can't look up the error message because it's a separate function call, and for
+        # all we know, a different Python thread took control between the call to WaitForSingleObject and the call to
+        # GetLastError() that would give us more info. So instead, we just give a generic error message.
+        raise RuntimeError("The handle could not be acquired.")
+    else:
+        # Something went wrong
+        raise RuntimeError("Unexpected status: " + str(status))
 
 
 # See http://code.activestate.com/recipes/577794-win32-named-mutex-class-for-system-wide-mutex/
@@ -70,13 +119,13 @@ class Mutex:
     _close.argtypes = [wintypes.HANDLE]
 
     # ctypes wrapper for windows function WaitForSingleObject
-    _wait_for = ctypes.windll.kernel32.WaitForSingleObject
-    _wait_for.restype = wintypes.BOOL
-    _wait_for.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+    # _wait_for = ctypes.windll.kernel32.WaitForSingleObject
+    # _wait_for.restype = wintypes.BOOL
+    # _wait_for.argtypes = [wintypes.HANDLE, wintypes.DWORD]
 
-    MUTEX_TIMED_OUT = 0x102
-    MUTEX_RELEASED_NORMALLY = 0
-    MUTEX_RELEASED_DUE_TO_PROGRAM_EXIT = 0x80
+    MUTEX_TIMED_OUT = win32con.WAIT_TIMEOUT  # 0x102
+    MUTEX_RELEASED_NORMALLY = win32con.WAIT_OBJECT_0  # 0
+    MUTEX_RELEASED_DUE_TO_PROGRAM_EXIT = win32con.WAIT_ABANDONED  # 0x80
 
     def __init__(self, name):
         self._name = name
@@ -115,30 +164,7 @@ class Mutex:
             self._held_count += 1
             return True
 
-        if timeout is None:
-            # max int, never time out.
-            timeout_milliseconds = 0xFFFFFFFF
-        else:
-            # approximate max int, take minimum between the two
-            timeout_milliseconds = max(min(0xFFFFFFFE, timeout * 1000), 1)
-
-        # Return Values:
-        #   0x102 indicates the request timed out
-        #   0 indicates the lock was already available or the other program released the handle by calling ReleaseMutex
-        #   0x80 indicates the other program released the handle when it exited
-        #   Any other value indicates an error handling the request in Windows itself
-        status = self._wait_for(self._handle, timeout_milliseconds)
-
-        if status == self.MUTEX_TIMED_OUT:
-            # Request timed out
-            return False
-        elif status in (self.MUTEX_RELEASED_NORMALLY, self.MUTEX_RELEASED_DUE_TO_PROGRAM_EXIT):
-            # Mutex was acquired
-            self._held_count += 1
-            return True
-        else:
-            # Something went wrong
-            raise RuntimeError("Failed to lock mutex " + repr(self._name) + ". Status: " + str(status))
+        return wait_for_handle(self._handle, timeout)
 
     def unlock(self):
         """Called to unlock the mutex. This should be called once for each time
@@ -168,6 +194,8 @@ class Mutex:
         return False  # Indicates that errors should NOT be suppressed.
 
 
+# TODO: This is a kludge built on top of Mutex. Revamp it to use the underlying Windows semaphore functionality for
+#       greater efficiency.
 class Semaphore:
     """A semaphore is an inter-process lock which up to N running processes can
     own at a time. It is similar to a mutex, except that there
