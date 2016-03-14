@@ -5,8 +5,13 @@ attila.threads
 Classes and functions for multi-threaded environments and inter-thread/process synchronization and communication.
 """
 
-import time
 import ctypes
+import sys
+import threading
+import time
+import traceback
+
+import pythoncom
 
 from ctypes import wintypes
 
@@ -15,6 +20,8 @@ from ctypes import wintypes
 __all__ = [
     "Mutex",
     "Semaphore",
+    "AsyncCall",
+    "async",
 ]
 
 
@@ -273,3 +280,51 @@ class Semaphore:
         is exited."""
         self.unlock()
         return False  # Indicates that errors should NOT be suppressed.
+
+
+class AsyncCall(threading.Thread):
+    """
+    A specialized thread to call a function asynchronously and capture the return value or exception info when it
+    becomes available.
+    """
+
+    def __init__(self, group=None, target=None, name=None, args=(), kwargs=None, *, daemon=None):
+        super().__init__(group, self._target_wrapper, name, args, kwargs, daemon=daemon)
+        self._wrapped_target = target
+        self.terminated = False
+        self.return_value = None
+        self.exception = None
+        self.traceback = None
+        self.exc_info = (None, None, None)
+
+    def _target_wrapper(self, *args, **kwargs):
+        """
+        Wraps the target function, capturing its return value or exception info.
+        """
+        pythoncom.CoInitialize()
+        try:
+            if self._wrapped_target:
+                self.return_value = self._wrapped_target(*args, **kwargs)
+            self.terminated = True
+        except Exception as exc:
+            self.exception = exc
+            self.traceback = traceback.format_exc()
+            self.exc_info = sys.exc_info()
+            raise
+        finally:
+            pythoncom.CoUninitialize()
+
+
+def async(function, *args, **kwargs):
+    """
+    Asynchronously call a function, returning an AsyncCall object through which the return value or exception info can
+    be accessed once the call completes.
+
+    :param function: The function to call in the background.
+    :param args: The arguments to pass to the function.
+    :param kwargs: The keyword arguments to pass to the function.
+    :return: An AsyncCall object through which the return value or exception info can be accessed.
+    """
+    thread = AsyncCall(target=function, args=args, kwargs=kwargs, daemon=True)
+    thread.start()
+    return thread
