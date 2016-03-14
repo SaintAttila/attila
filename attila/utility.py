@@ -9,6 +9,14 @@ import sys
 import time
 
 
+class TooFewItemsError(ValueError):
+    """Too few items in a sequence to perform an operation."""
+
+
+class TooManyItemsError(ValueError):
+    """Too many items in a sequence to perform an operation."""
+
+
 def first(items):
     """
     Return the first item from a sequence. If the item sequence does not contain at least one value, raise an exception.
@@ -18,7 +26,7 @@ def first(items):
     """
     for item in items:
         return item
-    raise ValueError("No items found in sequence.")
+    raise TooFewItemsError("No items found in sequence.")
 
 
 def last(items):
@@ -34,7 +42,7 @@ def last(items):
         result = item
         found = True
     if not found:
-        raise ValueError("No items found in sequence.")
+        raise TooFewItemsError("No items found in sequence.")
     return result
 
 
@@ -54,12 +62,12 @@ def only(items, ignore_duplicates=False):
     for item in items:
         if found:
             if not ignore_duplicates or result != item:
-                raise ValueError("Multiple items found in sequence.")
+                raise TooManyItemsError("Multiple items found in sequence.")
         else:
             found = True
             result = item
     if not found:
-        raise ValueError("No items found in sequence.")
+        raise TooFewItemsError("No items found in sequence.")
     return result
 
 
