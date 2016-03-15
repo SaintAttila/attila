@@ -11,11 +11,11 @@ import threading
 import time
 import traceback
 
+from ctypes import wintypes
+
 import pythoncom
 import win32con
 import win32event
-
-from ctypes import wintypes
 
 
 # This determines what gets imported by "from <module> import *" statements.
