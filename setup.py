@@ -6,7 +6,8 @@ from info import info
 
 
 cwd = os.getcwd()
-os.chdir(os.path.dirname(__file__))
+if os.path.dirname(__file__):
+    os.chdir(os.path.dirname(__file__))
 try:
     setup(
         # Stuff extracted from the library info:
