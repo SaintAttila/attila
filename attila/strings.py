@@ -364,3 +364,48 @@ def parse_datetime(string, parser=None):
     else:
         assert isinstance(parser, DateTimeParser)
     return parser.parse(string)
+
+
+def split_port(ip_port, default=None):
+    """
+    Split an IP:port pair.
+
+    :param ip_port: The IP:port pair.
+    :param default: The default port if none is specified in the ip_port.
+    :return: A tuple, (IP, port), where IP is a string and port is either an integer or is the default.
+    """
+    assert isinstance(ip_port, str)
+    assert ip_port
+    if ':' in ip_port:
+        server, port = ip_port.split(':')
+        port = int(port)
+    else:
+        server = ip_port
+        port = default
+    return server, port
+
+
+def to_list_of_strings(items, normalizer=None):
+    """
+    Convert a parameter value, which may be None, a delimited string, or a sequence of non-delimited strings, into a
+    list of unique, non-empty, non-delimited strings.
+
+    :param items: The set of items, in whatever form they may take.
+    :param normalizer: A function which normalizes the items.
+    :return: The separated, normalized items, in a list.
+    """
+    if not items:
+        return []
+    if isinstance(items, str):
+        # Split by commas, pipes, and/or semicolons
+        items = re.split(',|;', items)
+    else:
+        items = list(items)
+
+    for item in items:
+        assert isinstance(item, str)
+
+    if normalizer:
+        items = [normalizer(item) for item in items if item.strip()]
+
+    return [item.strip() for item in items if item.strip()]
