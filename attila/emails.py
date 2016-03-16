@@ -180,6 +180,8 @@ class EmailChannel(attila.notifications.Channel):
     options
     """
 
+    # TODO: Add load_from_config() class method.
+
     def __init__(self, server, sender, to, cc=None, bcc=None, html=False):
         server, port = attila.strings.split_port(server, default=25)
         sender = validate_email(sender)
@@ -262,6 +264,8 @@ class EmailNotifier(attila.notifications.Notifier):
     A notifier acts as a template for notifications, formatting the objects it is given into a standardized template
     and sending the resulting notification on to a particular channel.
     """
+
+    # TODO: Add load_from_config() class method.
 
     def __init__(self, channel, subject_template, body_template, footer=True):
         assert isinstance(channel, EmailChannel)
