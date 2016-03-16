@@ -6,8 +6,6 @@ Base classes and null implementations for notification functionality.
 """
 from abc import ABCMeta, abstractmethod
 
-__author__ = 'Aaron Hosford'
-
 
 class Channel(metaclass=ABCMeta):
     """
