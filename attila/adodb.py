@@ -5,6 +5,9 @@ attila.adodb
 ADODB database interface for Python
 """
 
+import configparser
+
+
 import win32com.client
 
 
@@ -70,7 +73,32 @@ class SQLConnectionInfo:
     using multiple parameters to a function. Use str(connection_info) to get the actual connection string.
     """
 
-    def __init__(self, server, database, driver=None, user=None, password=None, trusted=None):
+    @classmethod
+    def load_from_config(cls, config, section):
+        """
+        Load the SQL connection info from a section in a config file.
+
+        :param config: A configparser.ConfigParser instance.
+        :param section: The section to load the connection info from.
+        :return: A SQLConnectionInfo instance.
+        """
+
+        assert isinstance(config, configparser.ConfigParser)
+
+        config_section = config[section]
+
+        server = config_section['Server']
+        database = config_section['Database']
+        driver = config_section.get('Driver')
+        trusted = config.getboolean(section, 'Trusted', fallback=None)
+
+        # This has to be imported here because the security module depends on this one.
+        import attila.security
+        credential = attila.security.Credential.load_from_config(config, section)
+
+        return cls(server, database, driver, credential, trusted)
+
+    def __init__(self, server, database, driver=None, credential=None, trusted=None):
         assert isinstance(server, str)
         assert server
 
@@ -81,28 +109,17 @@ class SQLConnectionInfo:
             assert isinstance(driver, str)
             assert driver
 
-        assert (user is None) == (password is None)
-
-        if user is not None:
-            assert isinstance(user, str)
-            assert user
-
-        if password is not None:
-            assert isinstance(password, str)
-            assert password
+        assert not credential or (credential.user and credential.password)
 
         if trusted is not None:
             assert trusted in (0, 1, False, True)
             trusted = bool(trusted)
-            if trusted:
-                assert not user
-                assert not password
+            assert not trusted or not credential
 
         self._server = server
         self._database = database
         self._driver = driver or 'SQL Server'
-        self._user = user
-        self._password = password
+        self._credential = credential if credential else None
         self._trusted = trusted
 
     @property
@@ -118,12 +135,8 @@ class SQLConnectionInfo:
         return self._driver
 
     @property
-    def user(self):
-        return self._user
-
-    @property
-    def password(self):
-        return self._password
+    def credential(self):
+        return self._credential
 
     @property
     def trusted(self):
@@ -131,8 +144,9 @@ class SQLConnectionInfo:
 
     def __str__(self):
         result = "Driver={%s};Server={%s};Database={%s}" % (self._driver, self._server, self._database)
-        if self._user is not None:
-            result += ";Uid={%s};Pwd={%s}" % (self._user, self._password)
+        if self._credential:
+            user, password = self._credential
+            result += ";Uid={%s};Pwd={%s}" % (user, password)
         if self._trusted is not None:
             result += ";Trusted_Connection=%s" % repr(self._trusted)
         return result
@@ -140,8 +154,7 @@ class SQLConnectionInfo:
     def __repr__(self):
         keyword = False
         args = [self._server, self._database]
-        for name, value in (('driver', self._driver), ('user', self._user),
-                            ('password', self._password), ('trusted', self._trusted)):
+        for name, value in (('driver', self._driver), ('credential', self._credential), ('trusted', self._trusted)):
             if value is None or (name == 'driver' and value.lower() == 'sql server'):
                 keyword = True
                 continue
