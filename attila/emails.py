@@ -6,6 +6,7 @@ Email notification functionality.
 """
 
 
+import configparser
 import datetime
 import email
 import email.mime.base
@@ -131,18 +132,33 @@ def get_standard_footer():
     server = socket.gethostname()
     timestamp = datetime.datetime.now().strftime('%m/%d/%Y %I:%M:%S %p')
 
-    # TODO: Try to load this from the automation config, and fall back on this.
-    template = """
+    # The default footer template. We wrap it in a call to textwrap.dedent
+    # because triple-quoted strings preserve indentation.
+    template = textwrap.dedent(
+        """
 
-    **************************************************
-    ** System: \t{system}
-    ** Account:\t{account}
-    ** Server: \t{server}
-    ** Sent:   \t{timestamp}
-    **************************************************
-    """
+        **************************************************
+        ** System: \t{system}
+        ** Account:\t{account}
+        ** Server: \t{server}
+        ** Sent:   \t{timestamp}
+        **************************************************
+        """
+    )
 
-    return textwrap.dedent(template).format(system=system, account=account, server=server, timestamp=timestamp)
+    # Try to load the footer template from the automation config.
+    # If it can't be found, just use the default provided above.
+    config = attila.env.get_automation_config()
+    if 'Email' in config:
+        section = config['Email']
+        if 'Standard Footer' in section:
+            template = section['Standard Footer']
+        elif 'Standard Footer Path' in section:
+            path = section['Standard Footer Path']
+            with open(path, 'r') as template_file:
+                template = template_file.read()
+
+    return template.format(system=system, account=account, server=server, timestamp=timestamp)
 
 
 class Email:
@@ -180,7 +196,25 @@ class EmailChannel(attila.notifications.Channel):
     options
     """
 
-    # TODO: Add load_from_config() class method.
+    @classmethod
+    def load_from_config(cls, config, section):
+        """
+        Load an email channel from a section in a config file.
+
+        :param config: The loaded config file.
+        :param section: The section name in the config file.
+        :return: A new email channel.
+        """
+        assert isinstance(config, configparser.ConfigParser)
+        assert section and isinstance(section, str)
+        config_section = config[section]
+        server = config_section['SMTP Server']
+        sender = config_section['From']
+        to = config_section['To']
+        cc = config_section.get('CC')
+        bcc = config_section.get('BCC')
+        html = config.getboolean(section, 'HTML Content', fallback=False)
+        return cls(server, sender, to, cc, bcc, html)
 
     def __init__(self, server, sender, to, cc=None, bcc=None, html=False):
         server, port = attila.strings.split_port(server, default=25)
@@ -261,11 +295,33 @@ class EmailChannel(attila.notifications.Channel):
 
 class EmailNotifier(attila.notifications.Notifier):
     """
-    A notifier acts as a template for notifications, formatting the objects it is given into a standardized template
-    and sending the resulting notification on to a particular channel.
+    An email notifier acts as a template for email notifications, formatting the objects it is given into a standardized
+    template and sending the resulting email notification on to a particular channel.
     """
 
-    # TODO: Add load_from_config() class method.
+    @classmethod
+    def load_from_config(cls, config, section):
+        """
+        Load an email notifier from a section in a config file.
+
+        :param config: The loaded config file.
+        :param section: The section name in the config file.
+        :return: A new email notifier.
+        """
+        assert isinstance(config, configparser.ConfigParser)
+        assert section and isinstance(section, str)
+        config_section = config[section]
+        channel_name = config_section['Channel']
+        channel = EmailChannel.load_from_config(config, channel_name)
+        subject_template = config_section['Subject']
+        if 'Body' in config_section:
+            body_template = config_section['Body']
+        else:
+            body_path = config_section['Body Path']
+            with open(body_path, 'r') as body_file:
+                body_template = body_file.read()
+        footer = config.getboolean(section, 'Footer Stamp', fallback=True)
+        return cls(channel, subject_template, body_template, footer)
 
     def __init__(self, channel, subject_template, body_template, footer=True):
         assert isinstance(channel, EmailChannel)
