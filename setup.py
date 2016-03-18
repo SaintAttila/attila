@@ -28,7 +28,29 @@ try:
             'appdirs',
 
             # In-house:
-        ]
+        ],
+        entry_points={
+            'attila.channel_type': [
+                'callback = attila.notifications:CallbackChannel',
+                'log = attila.notifications:LogChannel',
+                'file = attila.notifications:FileChannel',
+                'email = attila.notifications:EmailChannel',
+            ],
+            'attila.channel': [
+                'null = attila.notifications:NULL_CHANNEL',
+                'stdout = attila.notifications:STDOUT_CHANNEL',
+                'stderr = attila.notifications:STDERR_CHANNEL',
+            ],
+            'attila.notifier_type': [
+                'raw = attila.notifications:RawNotifier',
+                'email = attila.notifications:EmailNotifier',
+            ],
+            'attila.notifier': [
+                'null = attila.notifications:NULL_NOTIFIER',
+                'stdout = attila.notifications:STDOUT_NOTIFIER',
+                'stderr = attila.notifications:STDERR_NOTIFIER',
+            ]
+        }
     )
 finally:
     os.chdir(cwd)
