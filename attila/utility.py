@@ -214,3 +214,25 @@ def wait_for_keypress():
     """
     while not msvcrt.kbhit():
         time.sleep(.1)
+
+
+# noinspection PyPep8Naming
+class once:  # Lower-case naming is standard for decorators.
+    """
+    Function decorator to make a function callable exactly once. Once a function has successfully returned without an
+    exception, subsequent calls just return the same return value as the first call.
+
+    :param function: The function to be wrapped.
+    :return: The wrapped function.
+    """
+
+    def __init__(self, function):
+        self._function = function
+        self._called = False
+        self._return_value = None
+
+    def __call__(self, *args, **kwargs):
+        if self._called:
+            return self._return_value
+        self._return_value = self._function(*args, **kwargs)
+        self._called = True
