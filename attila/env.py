@@ -11,6 +11,9 @@ import inspect
 import os
 
 
+from . import notifications
+
+
 _CONFIG_EXTENSIONS = (
     '.ini',
     '.cfg',
@@ -144,6 +147,7 @@ def get_entry_point_name(default=None):
     :param default: The default return value if no module could be identified.
     :return: The name of the identified module, or the default value.
     """
+    # My apologies in advance for what you are about to witness here...
     frame = inspect.currentframe()
     result = default
     while frame:
@@ -176,9 +180,9 @@ class AutomationEnvironment:
             assert isinstance(start_time, datetime.datetime)
 
         if name is None:
-            name = get_entry_point_name('anonymous')
+            name = get_entry_point_name('UNKNOWN')
         elif not name:
-            name = 'anonymous'
+            name = 'UNKNOWN'
         assert name
         assert isinstance(name, str)
 
@@ -188,27 +192,29 @@ class AutomationEnvironment:
 
         automation_config = get_automation_config()
 
-        automation_root_dir = automation_config['DEFAULT'].get('Root Path') or '~/.automation'
+        env_section = automation_config.get('Environment', {})
 
-        default_workspace = automation_config['DEFAULT'].get('Workspace Path') or os.path.join('{root}', 'workspace')
-        default_log_dir = automation_config['DEFAULT'].get('Logging Path') or os.path.join('{root}', 'logs')
-        default_docs_dir = automation_config['DEFAULT'].get('Documentation Path') or os.path.join('{root}', 'docs')
-        default_data_dir = automation_config['DEFAULT'].get('Data Path') or os.path.join('{root}', 'data')
-        default_log_file_name = automation_config['DEFAULT'].get('Log File Name') or '{name}_%Y%m%d%H%M%S.log'
-        default_log_format = (automation_config['DEFAULT'].get('Log Format') or
-                              '%(asctime)s_pid:%(process)d ~*~ %(message)s')
+        automation_root_dir = env_section.get('Root Path') or '~/.automation'
+
+        default_workspace = env_section.get('Workspace Path') or os.path.join('{root}', 'workspace')
+        default_log_dir = env_section.get('Logging Path') or os.path.join('{root}', 'logs')
+        default_docs_dir = env_section.get('Documentation Path') or os.path.join('{root}', 'docs')
+        default_data_dir = env_section.get('Data Path') or os.path.join('{root}', 'data')
+        default_log_file_name = env_section.get('Log File Name') or '{name}_%Y%m%d%H%M%S.log'
+        default_log_format = env_section.get('Log Format') or '%(asctime)s_pid:%(process)d ~*~ %(message)s'
+        default_error_channel = env_section.get('Error Channel')
 
         mapping = {
             'name': name,
             'root': automation_root_dir
         }
 
-        workspace = config['DEFAULT'].get('Workspace Path') or os.path.join(default_workspace, '{name}')
-        log_dir = config['DEFAULT'].get('Logging Path') or os.path.join(default_log_dir, '{name}')
-        data_dir = config['DEFAULT'].get('Data Path') or os.path.join(default_data_dir, '{name}')
-        docs_dir = config['DEFAULT'].get('Documentation Path') or os.path.join(default_docs_dir, '{name}')
-        log_file_name = config['DEFAULT'].get('Log File Name') or default_log_file_name
-        log_format = config['DEFAULT'].get('Log Format') or default_log_format
+        workspace = config['Environment'].get('Workspace Path') or os.path.join(default_workspace, '{name}')
+        log_dir = config['Environment'].get('Logging Path') or os.path.join(default_log_dir, '{name}')
+        data_dir = config['Environment'].get('Data Path') or os.path.join(default_data_dir, '{name}')
+        docs_dir = config['Environment'].get('Documentation Path') or os.path.join(default_docs_dir, '{name}')
+        log_file_name = config['Environment'].get('Log File Name') or default_log_file_name
+        log_format = config['Environment'].get('Log Format') or default_log_format
 
         workspace = self._fill_parameter(workspace, start_time, mapping)
         log_dir = self._fill_parameter(log_dir, start_time, mapping)
@@ -218,6 +224,14 @@ class AutomationEnvironment:
 
         log_file_path = os.path.join(log_dir, log_file_name)
 
+        # TODO: Load and use default notifiers.
+        # TODO: Integrate these notifiers into the environment, so notifications are automatically sent at the appropriate times.
+        start_notifier = notifications.load_notifier_from_config(config, 'Start Notifier')  # Script start
+        success_notifier = notifications.load_notifier_from_config(config, 'Success Notifier')  # Script success (not necessarily terminated)
+        failure_notifier = notifications.load_notifier_from_config(config, 'Failure Notifier')  # Script failure (not necessarily terminated or an error)
+        error_notifier = notifications.load_notifier_from_config(config, 'Error Notifier')  # Script error (not necessarily terminated or a failure)
+        end_notifier = notifications.load_notifier_from_config(config, 'End Notifier')  # Script termination (not necessarily a success)
+
         self._name = name
         self._config = config
         self._workspace = workspace
@@ -226,6 +240,7 @@ class AutomationEnvironment:
         self._data_dir = data_dir
         self._log_file_path = log_file_path
         self._log_format = log_format
+        self._error_notifier = error_notifier
 
     @property
     def name(self):
@@ -289,3 +304,15 @@ class AutomationEnvironment:
         :return: A directory path, as a str instance.
         """
         return self._data_dir
+
+    @property
+    def error_notifier(self):
+        return self._error_notifier
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type or exc_val or exc_tb:
+            self._error_notifier.send(exc_type, exc_val, exc_tb)
+        return False  # Do not suppress exceptions.
