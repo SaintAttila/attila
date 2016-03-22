@@ -115,6 +115,8 @@ class FTPTempWD:
         return False  # Do not suppress exceptions.
 
 
+# TODO: Make this inherit from attila.files.FileSystemConnection, and we will instantly get many of the file-system
+#       operations implemented there for free.
 class FTPConnection:
 
     def __init__(self, connection_info):
