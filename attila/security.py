@@ -280,12 +280,12 @@ def get_password_database():
     Get the connection string to the password database.
 
     :return: The SQL connection info for the password database.
-    :rtype: attila.adodb.SQLConnectionInfo
+    :rtype: attila.adodb.ADODBConnectionInfo
     """
     section = attila.env.get_automation_config().get('Security', {}).get('Password Database')
     if section is None:
         raise KeyError("The Password Database parameter is not set in the automation config.")
-    return attila.adodb.SQLConnectionInfo.load_from_config(attila.env.get_automation_config(), section)
+    return attila.adodb.ADODBConnectionInfo.load_from_config(attila.env.get_automation_config(), section)
 
 
 def get_user_account_hash(account_name=None):
@@ -552,7 +552,7 @@ def get_systems():
     """
 
     # Query the DB for the username.
-    with attila.adodb.Connection(get_password_database()) as oConnection:
+    with attila.adodb.ADODBConnection(get_password_database()) as oConnection:
         results = oConnection.Execute(
             "SELECT DISTINCT System FROM AutomationPasswords"
         ).convert()
@@ -572,7 +572,7 @@ def get_user_names(system_name, valid=True):
     """
 
     # Query the DB for the username.
-    with attila.adodb.Connection(get_password_database()) as oConnection:
+    with attila.adodb.ADODBConnection(get_password_database()) as oConnection:
         results = oConnection.Execute(
             "SELECT UserName FROM AutomationPasswords WHERE System = '" +
             system_name + "' AND Valid = " + str(int(valid))
@@ -609,7 +609,7 @@ def set_password(system_name, user_name, password, valid=True, refresh_master=Tr
     encrypted_password = from_bytes(base64.b64encode(encrypted_password))
 
     # Write the username/password to the DB.
-    with attila.adodb.Connection(get_password_database()) as connection:
+    with attila.adodb.ADODBConnection(get_password_database()) as connection:
         results = connection.Execute(
             "SELECT Password FROM AutomationPasswords WHERE System = '" +
             system_name + "' AND UserName = '" + user_name + "'"
@@ -642,7 +642,7 @@ def get_password(system, user_name, refresh_master=True):
     """
 
     # Query the DB for the username's password.
-    with attila.adodb.Connection(get_password_database()) as connection:
+    with attila.adodb.ADODBConnection(get_password_database()) as connection:
         results = connection.Execute(
             "SELECT Password FROM AutomationPasswords WHERE System = '" +
             system + "' AND UserName = '" + user_name + "' AND Valid = 1"
@@ -673,7 +673,7 @@ def invalidate_password(system_name, user_name):
     """
 
     # Set the valid password flag to false in the DB.
-    with attila.adodb.Connection(get_password_database()) as oConnection:
+    with attila.adodb.ADODBConnection(get_password_database()) as oConnection:
         oConnection.Execute(
             "UPDATE AutomationPasswords SET Valid = 0 WHERE System = '" +
             system_name + "' AND UserName = '" + user_name + "'"
@@ -689,7 +689,7 @@ def remove_user_name(system_name, user_name):
     """
 
     # Delete the username/password from the DB.
-    with attila.adodb.Connection(get_password_database()) as oConnection:
+    with attila.adodb.ADODBConnection(get_password_database()) as oConnection:
         oConnection.Execute(
             "DELETE FROM AutomationPasswords WHERE System = '" + system_name +
             "' AND UserName = '" + user_name + "'"

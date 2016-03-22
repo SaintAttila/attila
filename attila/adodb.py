@@ -67,20 +67,20 @@ class RecordSet:
             return results
 
 
-class SQLConnectionInfo:
+class ADODBConnectionInfo:
     """
-    Stores the SQL connection information for a database as a single object which can then be passed around instead of
+    Stores the ADODB connection information for a database as a single object which can then be passed around instead of
     using multiple parameters to a function. Use str(connection_info) to get the actual connection string.
     """
 
     @classmethod
     def load_from_config(cls, config, section):
         """
-        Load the SQL connection info from a section in a config file.
+        Load the ADODB connection info from a section in a config file.
 
         :param config: A configparser.ConfigParser instance.
         :param section: The section to load the connection info from.
-        :return: A SQLConnectionInfo instance.
+        :return: A ADODBConnectionInfo instance.
         """
 
         assert isinstance(config, configparser.ConfigParser)
@@ -142,6 +142,9 @@ class SQLConnectionInfo:
     def trusted(self):
         return self._trusted
 
+    def connect(self, command_timeout=None, connection_timeout=None, auto_reconnect=True, cursor_location=None):
+        return ADODBConnection(self, command_timeout, connection_timeout, auto_reconnect, cursor_location)
+
     def __str__(self):
         result = "Driver={%s};Server={%s};Database={%s}" % (self._driver, self._server, self._database)
         if self._credential:
@@ -153,7 +156,7 @@ class SQLConnectionInfo:
 
     def __repr__(self):
         keyword = False
-        args = [self._server, self._database]
+        args = [repr(self._server), repr(self._database)]
         for name, value in (('driver', self._driver), ('credential', self._credential), ('trusted', self._trusted)):
             if value is None or (name == 'driver' and value.lower() == 'sql server'):
                 keyword = True
@@ -165,20 +168,20 @@ class SQLConnectionInfo:
         return type(self).__name__ + '(' + ', '.join(args) + ')'
 
 
-class Connection:
+class ADODBConnection:
 
     def __init__(self, connection_info, command_timeout=None, connection_timeout=None, auto_reconnect=True,
                  cursor_location=None):
         """
-        Create a new Connection instance.
+        Create a new ADODBConnection instance.
 
         Example:
             # Get a connection to the database with a command timeout of 100 seconds
             # and a connection timeout of 10 seconds.
-            connection = Connection(connection_info, 100, 10)
+            connection = ADODBConnection(connection_info, 100, 10)
         """
 
-        assert isinstance(connection_info, (str, SQLConnectionInfo))
+        assert isinstance(connection_info, (str, ADODBConnectionInfo))
 
         self._com_object = None
 
@@ -215,7 +218,7 @@ class Connection:
         if self._com_object is not None and (self._com_object.State & Constants.adStateOpen):
             return  # If it's open already, do nothing.
 
-        self._com_object = win32com.client.Dispatch("ADODB.Connection")
+        self._com_object = win32com.client.Dispatch("ADODB.ADODBConnection")
 
         # The command timeout is how long it takes to complete a command.
         self._com_object.CommandTimeout = self._command_timeout
