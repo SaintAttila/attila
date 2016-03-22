@@ -454,7 +454,7 @@ class Path:
 
     def remove(self):
         """
-        Recursively remove the folder or file.
+        Remove the folder or file.
         """
 
         assert self.exists
@@ -471,7 +471,7 @@ class Path:
 
     def discard(self):
         """
-        Recursively remove the folder or file.
+        Remove the folder or file.
         """
 
         if self.exists:
