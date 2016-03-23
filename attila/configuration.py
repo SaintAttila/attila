@@ -1,5 +1,5 @@
 from abc import ABCMeta, abstractmethod
-from configparser import ConfigParser
+import configparser
 
 __author__ = 'Aaron Hosford'
 
@@ -32,7 +32,7 @@ class Configurable(metaclass=ABCMeta):
         :param section: The name of the section the object should be configured from.
         :return: None
         """
-        assert isinstance(config, ConfigParser)
+        assert isinstance(config, configparser.ConfigParser)
         assert section and isinstance(section, str)
         raise NotImplementedError()
 
