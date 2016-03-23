@@ -11,6 +11,10 @@ import configparser
 import win32com.client
 
 
+from . import configuration
+from . import connections
+
+
 class Constants:
     """
     Microsoft-defined constants for use with ADODB.
@@ -67,10 +71,10 @@ class RecordSet:
             return results
 
 
-class ADODBConnectionInfo:
+class ADODBConnector(connections.Connector, configuration.Configurable):
     """
     Stores the ADODB connection information for a database as a single object which can then be passed around instead of
-    using multiple parameters to a function. Use str(connection_info) to get the actual connection string.
+    using multiple parameters to a function. Use str(connector) to get the actual connection string.
     """
 
     @classmethod
@@ -80,7 +84,7 @@ class ADODBConnectionInfo:
 
         :param config: A configparser.ConfigParser instance.
         :param section: The section to load the connection info from.
-        :return: A ADODBConnectionInfo instance.
+        :return: A ADODBConnector instance.
         """
 
         assert isinstance(config, configparser.ConfigParser)
@@ -98,12 +102,14 @@ class ADODBConnectionInfo:
 
         return cls(server, database, driver, credential, trusted)
 
-    def __init__(self, server, database, driver=None, credential=None, trusted=None):
-        assert isinstance(server, str)
-        assert server
+    def __init__(self, server=None, database=None, driver=None, credential=None, trusted=None):
+        if server is not None:
+            assert isinstance(server, str)
+            assert server
 
-        assert isinstance(database, str)
-        assert database
+        if database is not None:
+            assert isinstance(database, str)
+            assert database
 
         if driver is not None:
             assert isinstance(driver, str)
@@ -116,10 +122,51 @@ class ADODBConnectionInfo:
             trusted = bool(trusted)
             assert not trusted or not credential
 
+        super().__init__(adodb_connection)
+
         self._server = server
         self._database = database
         self._driver = driver or 'SQL Server'
         self._credential = credential if credential else None
+        self._trusted = trusted
+
+    def is_configured(self):
+        return self._server is not None and self._database is not None
+
+    def configure(self, config, section):
+        assert isinstance(config, configparser.ConfigParser)
+        assert section and isinstance(section, str)
+
+        super().configure(config, section)
+
+        config_section = config[section]
+
+        server = config_section['Server']
+        database = config_section['Database']
+        driver = config_section.get('Driver')
+        trusted = config.getboolean(section, 'Trusted', fallback=None)
+
+        # This has to be imported here because the security module depends on this module, and we would get an import
+        # cycle otherwise.
+        import attila.security
+
+        # TODO: This assumes a credential will be loaded. What if we don't need one?
+        credential = attila.security.Credential.load_from_config(config, section)
+
+        assert server
+        assert database
+
+        assert not credential or (credential.user and credential.password)
+
+        if trusted is not None:
+            assert trusted in (0, 1, False, True)
+            trusted = bool(trusted)
+            assert not trusted or not credential
+
+        self._server = server
+        self._database = database
+        self._driver = driver or 'SQL Server'
+        self._credential = credential
         self._trusted = trusted
 
     @property
@@ -142,8 +189,8 @@ class ADODBConnectionInfo:
     def trusted(self):
         return self._trusted
 
-    def connect(self, command_timeout=None, connection_timeout=None, auto_reconnect=True, cursor_location=None):
-        return ADODBConnection(self, command_timeout, connection_timeout, auto_reconnect, cursor_location)
+    def connection(self, command_timeout=None, connection_timeout=None, auto_reconnect=True, cursor_location=None):
+        return super().connection(command_timeout, connection_timeout, auto_reconnect, cursor_location)
 
     def __str__(self):
         result = "Driver={%s};Server={%s};Database={%s}" % (self._driver, self._server, self._database)
@@ -168,20 +215,24 @@ class ADODBConnectionInfo:
         return type(self).__name__ + '(' + ', '.join(args) + ')'
 
 
-class ADODBConnection:
+# TODO: Finish revamping this to conform to the connections.connection abstraction.
+# noinspection PyPep8Naming
+class adodb_connection(connections.connection):
 
-    def __init__(self, connection_info, command_timeout=None, connection_timeout=None, auto_reconnect=True,
+    def __init__(self, connector, command_timeout=None, connection_timeout=None, auto_reconnect=True,
                  cursor_location=None):
         """
-        Create a new ADODBConnection instance.
+        Create a new adodb_connection instance.
 
         Example:
             # Get a connection to the database with a command timeout of 100 seconds
             # and a connection timeout of 10 seconds.
-            connection = ADODBConnection(connection_info, 100, 10)
+            connection = adodb_connection(connector, 100, 10)
         """
 
-        assert isinstance(connection_info, (str, ADODBConnectionInfo))
+        assert isinstance(connector, ADODBConnector)
+
+        super().__init__(connector)
 
         self._com_object = None
 
@@ -197,17 +248,11 @@ class ADODBConnection:
         else:
             self._connection_timeout = connection_timeout
 
-        self._connection_info = connection_info
-
         self._auto_reconnect = bool(auto_reconnect)
 
         self._cursor_location = cursor_location
 
         self.open()
-
-    @property
-    def connection_info(self):
-        return self._connection_info
 
     @property
     def is_open(self):
@@ -216,16 +261,20 @@ class ADODBConnection:
     def open(self):
         # The state may have other bits set, but we only care about the one that indicates whether it's open or not.
         if self._com_object is not None and (self._com_object.State & Constants.adStateOpen):
-            return  # If it's open already, do nothing.
+            return  # If it's open_file already, do nothing.
 
-        self._com_object = win32com.client.Dispatch("ADODB.ADODBConnection")
+        self._com_object = win32com.client.Dispatch("ADODB.adodb_connection")
 
         # The command timeout is how long it takes to complete a command.
         self._com_object.CommandTimeout = self._command_timeout
         self._com_object.ConnectionTimeout = self._connection_timeout
         if self._cursor_location is not None:
             self._com_object.CursorLocation = self._cursor_location
-        self._com_object.Open(str(self._connection_info))
+        self._com_object.Open(str(self._connector))
+
+    def close(self):
+        """Close the ADODB connection"""
+        return self._com_object.Close()
 
     def begin(self):
         """Begin a new transaction, returning the transaction nesting depth."""
@@ -246,7 +295,7 @@ class ADODBConnection:
         or converted to read depending on how the stored procedure handles its data.
 
         Example:
-            # Execute a stored procedure with 2 parameters from an open connection.
+            # Execute a stored procedure with 2 parameters from an open_file connection.
             connection.execute_stored_procedure(stored_procedure_name, year_str, month_str)
 
         :param name: The name of the stored procedure to execute.
@@ -292,15 +341,3 @@ class ADODBConnection:
                 raise
         else:
             return self._com_object.Execute(command)
-
-    def close(self):
-        """Close the ADODB connection"""
-        return self._com_object.Close()
-
-    def __enter__(self):
-        return self  # The connection is automatically opened when it's created, so there's nothing to do.
-
-    # noinspection PyUnusedLocal
-    def __exit__(self, exc_type, exc_value, exc_tb):
-        self.close()
-        return False  # Do not suppress exceptions
