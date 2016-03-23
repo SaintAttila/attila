@@ -56,8 +56,8 @@ except ImportError:
 import cryptography.fernet
 
 
-import attila.adodb
-import attila.env
+from . import adodb
+from . import env
 
 
 # Make sure our DLLs are available up front. Think of these as similar to
@@ -270,22 +270,22 @@ def get_master_password_path():
     :return: The master password file path.
     """
     return (
-        attila.env.get_automation_config().get('Security', {}).get('Password Data Path') or
-        attila.env.get_attila_config()['Security']['Password Data Path']
+        env.get_automation_config().get('Security', {}).get('Password Data Path') or
+        env.get_attila_config()['Security']['Password Data Path']
     )
 
 
 def get_password_database():
     """
-    Get the connection string to the password database.
+    Get the connector to the password database.
 
-    :return: The SQL connection info for the password database.
-    :rtype: attila.adodb.ADODBConnectionInfo
+    :return: The ADODB connector for the password database.
+    :rtype: attila.adodb.ADODBConnector
     """
-    section = attila.env.get_automation_config().get('Security', {}).get('Password Database')
+    section = env.get_automation_config().get('Security', {}).get('Password Database')
     if section is None:
         raise KeyError("The Password Database parameter is not set in the automation config.")
-    return attila.adodb.ADODBConnectionInfo.load_from_config(attila.env.get_automation_config(), section)
+    return adodb.ADODBConnector.load_from_config(env.get_automation_config(), section)
 
 
 def get_user_account_hash(account_name=None):
@@ -552,7 +552,7 @@ def get_systems():
     """
 
     # Query the DB for the username.
-    with attila.adodb.ADODBConnection(get_password_database()) as oConnection:
+    with adodb.adodb_connection(get_password_database()) as oConnection:
         results = oConnection.Execute(
             "SELECT DISTINCT System FROM AutomationPasswords"
         ).convert()
@@ -572,7 +572,7 @@ def get_user_names(system_name, valid=True):
     """
 
     # Query the DB for the username.
-    with attila.adodb.ADODBConnection(get_password_database()) as oConnection:
+    with adodb.adodb_connection(get_password_database()) as oConnection:
         results = oConnection.Execute(
             "SELECT UserName FROM AutomationPasswords WHERE System = '" +
             system_name + "' AND Valid = " + str(int(valid))
@@ -609,7 +609,7 @@ def set_password(system_name, user_name, password, valid=True, refresh_master=Tr
     encrypted_password = from_bytes(base64.b64encode(encrypted_password))
 
     # Write the username/password to the DB.
-    with attila.adodb.ADODBConnection(get_password_database()) as connection:
+    with adodb.adodb_connection(get_password_database()) as connection:
         results = connection.Execute(
             "SELECT Password FROM AutomationPasswords WHERE System = '" +
             system_name + "' AND UserName = '" + user_name + "'"
@@ -642,7 +642,7 @@ def get_password(system, user_name, refresh_master=True):
     """
 
     # Query the DB for the username's password.
-    with attila.adodb.ADODBConnection(get_password_database()) as connection:
+    with adodb.adodb_connection(get_password_database()) as connection:
         results = connection.Execute(
             "SELECT Password FROM AutomationPasswords WHERE System = '" +
             system + "' AND UserName = '" + user_name + "' AND Valid = 1"
@@ -673,7 +673,7 @@ def invalidate_password(system_name, user_name):
     """
 
     # Set the valid password flag to false in the DB.
-    with attila.adodb.ADODBConnection(get_password_database()) as oConnection:
+    with adodb.adodb_connection(get_password_database()) as oConnection:
         oConnection.Execute(
             "UPDATE AutomationPasswords SET Valid = 0 WHERE System = '" +
             system_name + "' AND UserName = '" + user_name + "'"
@@ -689,33 +689,33 @@ def remove_user_name(system_name, user_name):
     """
 
     # Delete the username/password from the DB.
-    with attila.adodb.ADODBConnection(get_password_database()) as oConnection:
+    with adodb.adodb_connection(get_password_database()) as oConnection:
         oConnection.Execute(
             "DELETE FROM AutomationPasswords WHERE System = '" + system_name +
             "' AND UserName = '" + user_name + "'"
         )
 
 
-class Impersonation:
+class impersonation:
     """
     This class allows a script to log in as another user temporarily. It works as a context manager, so the typical
     usage will look like this:
 
-        with Impersonation(user_name, password):
+        with impersonation(user_name, password):
             # Do stuff that requires us to be logged in as user_name
 
     If you want to stay logged in as another user for the duration of your function's execution, do this:
 
-        impersonation = Impersonation(user_name, password)
-        impersonation.impersonate()
+        imp = impersonation(user_name, password)
+        imp.impersonate()
 
     This will leave you impersonating user_name until "impersonation" goes out of scope and gets garbage-collected,
-    or until you call impersonation.revert() or impersonation.logout().
+    or until you call imp.revert() or imp.logout().
 
-    If you want to stay logged in until your script exits, without having to keep a reference to an Impersonation
+    If you want to stay logged in until your script exits, without having to keep a reference to an impersonation
     instance, do this:
 
-        Impersonation.Sustained(user_name, password)
+        impersonation.Sustained(user_name, password)
     """
 
     DEFAULT_USER = 'ERNAMAUTO'
@@ -744,9 +744,9 @@ class Impersonation:
         key = (user_name, domain)
 
         if key not in cls._sustained:
-            impersonation = cls(user_name, password, domain)
-            impersonation.impersonate()
-            cls._sustained[key] = impersonation
+            imp = cls(user_name, password, domain)
+            imp.impersonate()
+            cls._sustained[key] = imp
 
     def __init__(self, user_name=None, password=None, domain=None):
         self.handle = None
