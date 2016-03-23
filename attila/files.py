@@ -1,5 +1,4 @@
 import csv
-import ctypes
 import glob
 import io
 import logging
@@ -9,6 +8,11 @@ import stat
 import tempfile
 import time
 
+from abc import ABCMeta
+from configparser import ConfigParser
+
+from . import configuration
+from . import connections
 
 log = logging.getLogger(__name__)
 
@@ -50,14 +54,48 @@ class TempFile:
         assert path.exists
         self._path = path
         self._file_obj = path.open(*args, **kwargs)
+        self._modified = False
+
+    def __del__(self):
+        self.close()
 
     @property
     def path(self):
         """The path to the temp file."""
         return self._path
 
-    def __del__(self):
-        self.close()
+    @property
+    def closed(self):
+        """Whether the file has been closed."""
+        return self._file_obj is None or self._file_obj.closed
+
+    @property
+    def encoding(self):
+        """The encoding of the file."""
+        return self._file_obj.encoding
+
+    @property
+    def name(self):
+        """The name of the file."""
+        return self._path.name
+
+    @property
+    def newlines(self):
+        """A string indicating the character sequence used for newlines."""
+        return self._file_obj.newlines
+
+    @property
+    def modified(self):
+        """Whether the file has been modified since the last flush."""
+        return self._modified
+
+    @modified.setter
+    def modified(self, value):
+        """Whether the file has been modified since the last flush."""
+        assert value == bool(value)
+        assert not self._modified or value
+        if value:
+            self._modified = True
 
     def close(self):
         """
@@ -67,6 +105,7 @@ class TempFile:
         """
         try:
             if self._file_obj is not None:
+                self.flush()  # Provides a hook for proxy writebacks.
                 self._file_obj.close()
         finally:
             self._file_obj = None
@@ -74,7 +113,8 @@ class TempFile:
 
     def flush(self):
         """Flush pending writes to disk."""
-        return self._file_obj.flush()
+        self._file_obj.flush()
+        self._modified = False
 
     def fileno(self):
         """The file number."""
@@ -139,6 +179,7 @@ class TempFile:
         :param size: The maximum size of the file.
         :return: None
         """
+        self._modified = True
         self._file_obj.truncate(size)
 
     def write(self, s):
@@ -148,6 +189,7 @@ class TempFile:
         :param s: The string or bytes to write.
         :return: None
         """
+        self._modified = True
         self._file_obj.write(s)
 
     def writelines(self, lines):
@@ -157,47 +199,156 @@ class TempFile:
         :param lines: The lines to write.
         :return: None
         """
+        self._modified = True
         self._file_obj.writelines(lines)
 
-    @property
-    def closed(self):
-        """Whether the file has been closed."""
-        return self._file_obj is None or self._file_obj.closed
 
-    @property
-    def encoding(self):
-        """The encoding of the file."""
-        return self._file_obj.encoding
-
-    @property
-    def name(self):
-        """The name of the file."""
-        return self._path.name
-
-    @property
-    def newlines(self):
-        """A string indicating the character sequence used for newlines."""
-        return self._file_obj.newlines
-
-
-# TODO: Do something similar to this for remote execution environments, patterned after attila.adodb.ADODBConnection
-class FileSystemConnection:
+class ProxyFile(TempFile):
     """
-    FileSystemConnection is an abstract base class for all file system connection-like classes, e.g.
-    LocalFileSystemConnection, HTTPConnection, FTPConnection, etc. Classes which inherit from this class are
-    responsible for handling file-system interactions on behalf of Path instances that use them as their respective
-    connection objects.
+    A ProxyFile is a TempFile that acts as a proxy to another file.
     """
+
+    def __init__(self, path, *args, proxy_path=None, writeback=None, **kwargs):
+        assert isinstance(path, Path)
+        assert writeback is None or callable(writeback)
+        if proxy_path is None:
+            proxy_path = local_fs_connection.get_temp_file_path(path.name)
+            if proxy_path is None:
+                raise NotImplementedError()
+        elif isinstance(proxy_path, str):
+            proxy_path = Path(proxy_path)
+        else:
+            assert isinstance(proxy_path, Path)
+        path.copy_to(proxy_path)
+        super().__init__(proxy_path, *args, **kwargs)
+        self._original_path = path
+        self._writeback = writeback
+
+    @property
+    def path(self):
+        """The path to the original file object being proxied."""
+        return self._original_path
+
+    @property
+    def proxy_path(self):
+        """The path to the temporary local file acting as a proxy."""
+        return self._path
+
+    def flush(self):
+        """Flush pending writes to disk. If writeback is set, copy changes from the proxy to the original file."""
+        self._file_obj.flush()
+        if self._writeback is not None and self._modified:
+            self._writeback(self._path, self._original_path)
+        self._modified = False
+
+
+class temp_cwd:
+    """
+    All this class does is temporarily change the working directory of a file system connection, and then change it
+    back. It's meant for use in a with statement. It only exists to allow Paths to be used as context.
+    """
+
+    def __init__(self, path):
+        assert isinstance(path, Path)
+        self._path = path
+        self._previous_path = None
+
+    def __enter__(self):
+        self._previous_path = None
+        if self._path:
+            previous_path = self._path.connection.cwd
+            self._previous_path = previous_path
+            self._path.connection.cwd = self._path
+        return self
+
+    # noinspection PyUnusedLocal
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self._previous_path is not None:
+            self._path.connection.cwd = self._previous_path
+            self._previous_path = None
+        return False  # Do not suppress exceptions.
+
+
+class FSConnector(connections.Connector, configuration.Configurable, metaclass=ABCMeta):
+    """
+    The FSConnector class is an abstract base class for file system connectors.
+    """
+
+    def __init__(self, connection_type, initial_cwd=None):
+        assert issubclass(connection_type, fs_connection)
+        assert initial_cwd is None or isinstance(initial_cwd, str)
+        super().__init__(connection_type)
+        self._initial_cwd = initial_cwd
+
+    @property
+    def initial_cwd(self):
+        """The initial CWD for new connections."""
+        return self._initial_cwd
+
+    @initial_cwd.setter
+    def initial_cwd(self, cwd):
+        """The initial CWD for new connections."""
+        assert cwd is None or isinstance(cwd, str)
+        self._initial_cwd = cwd or None
+
+    def configure(self, config, section):
+        """
+        Configure this instance based on the contents of a section loaded from a config file.
+
+        :param config: A configparser.ConfigParser instance.
+        :param section: The name of the section the object should be configured from.
+        :return: None
+        """
+        assert isinstance(config, ConfigParser)
+        assert section and isinstance(section, str)
+        initial_cwd = config.get(section, 'Initial CWD', fallback=None)
+        if initial_cwd is not None:
+            self.initial_cwd = initial_cwd or None
+
+    def connection(self, *args, **kwargs):
+        """Create a new connection and return it."""
+        result = super().connection(*args, **kwargs)
+        if self._initial_cwd:
+            result.cwd = self._initial_cwd
+        return result
+
+
+# TODO: Do something similar to this for remote execution environments, patterned after attila.adodb.adodb_connection
+# noinspection PyPep8Naming
+class fs_connection(connections.connection, metaclass=ABCMeta):
+    """
+    The fs_connection class is an abstract base class for connections to file systems, e.g. local_fs_connection,
+    http_fs_connection, ftp_fs_connection, etc. Classes which inherit from this class are responsible for handling file-
+    system interactions on behalf of Path instances that use them as their respective connection objects.
+    """
+
+    def __init__(self, connector):
+        assert isinstance(connector, FSConnector)
+        super().__init__(connector)
 
     def __eq__(self, other):
-        if not isinstance(other, FileSystemConnection):
+        if not isinstance(other, fs_connection):
             return NotImplemented
         return self is other
 
     def __ne__(self, other):
-        if not isinstance(other, FileSystemConnection):
+        if not isinstance(other, fs_connection):
             return NotImplemented
         return not (self == other)
+
+    @property
+    def cwd(self):
+        """
+        The current working directory of this file system connection, or None if CWD functionality is not supported.
+        """
+        return None
+
+    @cwd.setter
+    def cwd(self, path):
+        """
+        The current working directory of this file system connection, or None if CWD functionality is not supported.
+        """
+        raise NotImplementedError()
 
     def check_path(self, path):
         """
@@ -227,13 +378,31 @@ class FileSystemConnection:
 
         raise NotImplementedError()
 
-    def get_temp_dir(self):
+    @property
+    def temp_dir(self):
         """
         Locate a directory that can be safely used for temporary files.
 
         :return: The path to the temporary directory, or None.
         """
         return None
+
+    def get_temp_file_path(self, name_base=None):
+        """
+        Locate a path where a temporary file can be safely created.
+
+        :param name_base: An optional base for the file name.
+        :return: A temporary file path, or None.
+        """
+        if name_base is None:
+            name_base = 'temp'
+        temp_dir = self.temp_dir
+        if temp_dir is None:
+            return None
+        while True:
+            path = self.temp_dir[name_base + '_' + time.strftime('%Y%m%d%H%M%S')]
+            if not path.exists:
+                return path
 
     def abs_path(self, path):
         """
@@ -435,9 +604,10 @@ class FileSystemConnection:
         path = self.check_path(path)
         return [self.join(path, child) for child in self.list(path, pattern)]
 
-    def open(self, path, mode='r', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None):
+    def open_file(self, path, mode='r', buffering=-1, encoding=None, errors=None, newline=None, closefd=True,
+                  opener=None):
         """
-        Open the file system object.
+        Open the file.
 
         :param path: The path to operate on.
         :param mode: The file mode.
@@ -456,12 +626,12 @@ class FileSystemConnection:
         Return an iterator over the lines from the file.
 
         :param path: The path to operate on.
-        :param encoding: The file encoding used to open the file.
+        :param encoding: The file encoding used to open_file the file.
         :return: An iterator over the lines in the file, without newlines.
         """
         assert self.is_file(path)
 
-        with self.open(path, mode='r', encoding=encoding) as file_obj:
+        with self.open_file(path, mode='r', encoding=encoding) as file_obj:
             for line in file_obj:
                 line = line.rstrip('\r\n')
                 for piece in line.split(FORM_FEED_CHAR):
@@ -472,7 +642,7 @@ class FileSystemConnection:
         Returns a list containing the lines from the file.
 
         :param path: The path to operate on.
-        :param encoding: The file encoding used to open the file.
+        :param encoding: The file encoding used to open_file the file.
         :return: A list containing the lines in the file, without newlines.
         """
         return list(self.read(path, encoding))
@@ -484,10 +654,10 @@ class FileSystemConnection:
         :param path: The path to operate on.
         :param delimiter: The delimiter used to separate fields in each record.
         :param quote: The quote character used to surround field values in the record.
-        :param encoding: The file encoding used to open the file.
+        :param encoding: The file encoding used to open_file the file.
         :return: An iterator over the rows in the file.
         """
-        with self.open(path, encoding=encoding, newline='') as file_obj:
+        with self.open_file(path, encoding=encoding, newline='') as file_obj:
             reader = csv.reader(file_obj, delimiter=delimiter, quotechar=quote)
 
             # This is necessary because the reader only keeps a weak reference to the file, which means we can't just
@@ -502,7 +672,7 @@ class FileSystemConnection:
         :param path: The path to operate on.
         :param delimiter: The delimiter used to separate fields in each record.
         :param quote: The quote character used to surround field values in the record.
-        :param encoding: The file encoding used to open the file.
+        :param encoding: The file encoding used to open_file the file.
         :return: A list containing the rows in the file.
         """
         return list(self.read_delimited(path, delimiter, quote, encoding))
@@ -522,7 +692,7 @@ class FileSystemConnection:
         assert not overwrite or not append
         assert not self.exists(path) or ((overwrite or append) and self.is_file(path))
 
-        with self.open(path, mode=('a' if append else 'w'), encoding=encoding) as file_obj:
+        with self.open_file(path, mode=('a' if append else 'w'), encoding=encoding) as file_obj:
             index = -1
             for index, line in enumerate(lines):
                 file_obj.write(line.rstrip('\r\n') + '\n')
@@ -545,7 +715,7 @@ class FileSystemConnection:
         assert not overwrite or not append
         assert not self.exists(path) or ((overwrite or append) and self.is_file(path))
 
-        with self.open(path, mode=('a' if append else 'w'), encoding=encoding, newline='') as file_obj:
+        with self.open_file(path, mode=('a' if append else 'w'), encoding=encoding, newline='') as file_obj:
             writer = csv.writer(file_obj, delimiter=delimiter, quotechar=quote)
             index = -1
             for index, row in enumerate(rows):
@@ -578,7 +748,7 @@ class FileSystemConnection:
         # won't change the contents of the file in any case.
         # noinspection PyBroadException
         try:
-            with self.open(path, mode=open_mode):
+            with self.open_file(path, mode=open_mode):
                 return True
         except Exception:
             return False
@@ -641,8 +811,8 @@ class FileSystemConnection:
         :return: None
         """
         path = self.check_path(path)
-        with self.open(path, mode='rb') as source_file:
-            with destination.connection.open(destination, mode='wb') as target_file:
+        with self.open_file(path, mode='rb') as source_file:
+            with destination.connection.open_file(destination, mode='wb') as target_file:
                 for line in source_file:
                     target_file.write(line)
 
@@ -745,6 +915,19 @@ class FileSystemConnection:
         self.copy_to(path, destination, overwrite, clear, fill, check_only)
         self.remove(path)
 
+    def rename(self, path, new_name):
+        """
+        Rename a file object.
+
+        :param path: The path to be operated on.
+        :param new_name: The new name of the file object, as as string.
+        :return: None
+        """
+        path = Path(self.check_path(path), self)
+        assert new_name and isinstance(new_name, str)
+        if path.name != new_name:
+            self.move_to(path, path.dir[new_name], overwrite=False, clear=True, fill=False)
+
     def find_unique_file(self, path, pattern='*', most_recent=True):
         """
         Find a file in the folder matching the given pattern and return it. If no such file is found, return None. If
@@ -782,26 +965,65 @@ class FileSystemConnection:
             return files[0]
         elif most_recent:
             log.info("Only the most recent file will be used.")
-            result = max(files, key=lambda path: path.modified_time)
+            result = max(files, key=lambda matched_path: matched_path.modified_time)
             log.info("Most recent file: %s", result)
             return result
         else:
             raise FileExistsError("Multiple files identified matching the pattern %s in folder %s." % (pattern, path))
 
 
-class LocalFileSystemConnection(FileSystemConnection):
+class LocalFSConnector(FSConnector):
+
+    def __init__(self, initial_cwd=None):
+        super().__init__(local_fs_connection, initial_cwd)
+
+    def is_configured(self):
+        return True  # Always in a usable state.
+
+
+# noinspection PyPep8Naming
+class local_fs_connection(fs_connection):
     """
-    LocalFileSystemConnection implements an interface for the local file system, handling interactions with it on
+    local_fs_connection implements an interface for the local file system, handling interactions with it on
     behalf of Path instances.
     """
+
+    def __init__(self, connector=None):
+        if connector is None:
+            connector = LocalFSConnector()
+        else:
+            assert isinstance(connector, LocalFSConnector)
+        super().__init__(connector)
+        super().open()  # local fs connections are always open.
+
+    def open(self):
+        pass  # local fs connections are always open.
+
+    def close(self):
+        pass  # local fs connections are always open.
 
     def __repr__(self):
         return type(self).__name__ + '()'
 
     def __eq__(self, other):
-        if not isinstance(other, FileSystemConnection):
+        if not isinstance(other, fs_connection):
             return NotImplemented
-        return isinstance(other, LocalFileSystemConnection)
+        return isinstance(other, local_fs_connection)
+
+    @property
+    def cwd(self):
+        """The current working directory of this file system connection."""
+        # TODO: Should we track the CWD separately for each instance? The OS itself only provides one CWD per
+        #       process, but for other connection types (e.g. FTP) the CWD is a per-connection value, and this
+        #       might lead to slight incompatibilities between the different connection types which could
+        #       destroy the abstraction I've built.
+        return Path(os.getcwd(), self)
+
+    @cwd.setter
+    def cwd(self, path):
+        """The current working directory of this file system connection."""
+        path = self.check_path(path)
+        os.chdir(path)
 
     def find(self, path, include_cwd=True):
         """
@@ -828,7 +1050,7 @@ class LocalFileSystemConnection(FileSystemConnection):
 
         return None
 
-    def get_temp_dir(self):
+    def temp_dir(self):
         """
         Locate a directory that can be safely used for temporary files.
 
@@ -990,9 +1212,10 @@ class LocalFileSystemConnection(FileSystemConnection):
         assert self.is_dir(path)
         return [Path(match) for match in glob.iglob(os.path.join(path, pattern))]
 
-    def open(self, path, mode='r', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None):
+    def open_file(self, path, mode='r', buffering=-1, encoding=None, errors=None, newline=None, closefd=True,
+                  opener=None):
         """
-        Open the file system object.
+        Open the file.
 
         :param path: The path to operate on.
         :param mode: The file mode.
@@ -1092,63 +1315,6 @@ class LocalFileSystemConnection(FileSystemConnection):
             super().raw_copy(path, destination)
 
 
-# noinspection PyAbstractClass
-class HTTPFileSystemConnection(FileSystemConnection):
-    """
-    An HTTPSFileSystemConnection handles the underlying interactions with a remote file system accessed via HTTP on
-    behalf of Path instances.
-    """
-
-    def __repr__(self):
-        return type(self).__name__ + '()'
-
-    def __eq__(self, other):
-        if not isinstance(other, FileSystemConnection):
-            return NotImplemented
-        return isinstance(other, HTTPFileSystemConnection)
-
-    def open(self, path, mode='r', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None):
-        """
-        Open the file system object.
-
-        :param path: The path to operate on.
-        :param mode: The file mode.
-        :param buffering: The buffering policy.
-        :param encoding: The encoding.
-        :param errors: The error handling strategy.
-        :param newline: The character sequence to use for newlines.
-        :param closefd: Whether to close the descriptor after the file closes.
-        :param opener: A custom opener.
-        :return: The opened file object.
-        """
-        path = self.check_path(path)
-
-        if mode not in ('r', 'rb'):
-            raise ValueError("Unsupported mode: " + repr(mode))
-
-        # We can't work directly with an HTTP file using URLDownloadToFileW(). Instead, we make a temp file and return
-        # it as a proxy.
-        temp_path = LocalFileSystemConnection().get_temp_dir()[self.name(path) + '_' + time.strftime('%Y%m%d%H%M%S')]
-
-        # http://msdn.microsoft.com/en-us/library/ie/ms775123(v=vs.85).aspx
-        result = ctypes.windll.urlmon.URLDownloadToFileW(0, path, str(temp_path), 0, 0)
-
-        if result == 1:
-            raise MemoryError(
-                "Insufficient memory available to download " + path + ". (Return code 1)"
-            )
-        elif result != 0:
-            raise RuntimeError(
-                "Unspecified error while trying to download " + path + ". (Return code " + str(result) + ")"
-            )
-        elif not temp_path.is_file:
-            raise FileNotFoundError(
-                "File appeared to download successfully from " + path + " but could not be found afterward."
-            )
-
-        return TempFile(temp_path, mode, buffering, encoding, errors, newline, closefd, opener)
-
-
 class Path:
     """
     A Path consists of a string representing a location, together with a connection that indicates the object
@@ -1159,22 +1325,29 @@ class Path:
         if isinstance(path_string, Path):
             path_string = path_string._path_string
         assert isinstance(path_string, str)
-        assert connection is None or isinstance(connection, FileSystemConnection)
+        assert connection is None or isinstance(connection, fs_connection)
         if connection is None:
-            connection = LocalFileSystemConnection()
+            connection = local_fs_connection()
         self._path_string = path_string
         self._connection = connection
+        self._outer = None
 
     @property
     def connection(self):
         """The connection this path is accessed through."""
         return self._connection
 
+    def __bool__(self):
+        return bool(self._path_string)
+
+    def __enter__(self):
+        return temp_cwd(self)
+
     def __str__(self):
         return self._path_string
 
     def __repr__(self):
-        if isinstance(self._connection, LocalFileSystemConnection):
+        if isinstance(self._connection, local_fs_connection):
             return type(self).__name__ + '(' + repr(str(self)) + ')'
         else:
             return type(self).__name__ + repr((str(self), self._connection))
@@ -1424,13 +1597,13 @@ class Path:
         return self._connection.glob(self, pattern)
 
     def open(self, mode='r', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None):
-        return self._connection.open(self, mode, buffering, encoding, errors, newline, closefd, opener)
+        return self._connection.open_file(self, mode, buffering, encoding, errors, newline, closefd, opener)
 
     def read(self, encoding=None):
         """
         Return an iterator over the lines from the file.
 
-        :param encoding: The file encoding used to open the file.
+        :param encoding: The file encoding used to open_file the file.
         :return: An iterator over the lines in the file, without newlines.
         """
         return self._connection.read(self, encoding)
@@ -1439,7 +1612,7 @@ class Path:
         """
         Returns a list containing the lines from the file.
 
-        :param encoding: The file encoding used to open the file.
+        :param encoding: The file encoding used to open_file the file.
         :return: A list containing the lines in the file, without newlines.
         """
         return self._connection.read(self, encoding)
@@ -1450,7 +1623,7 @@ class Path:
 
         :param delimiter: The delimiter used to separate fields in each record.
         :param quote: The quote character used to surround field values in the record.
-        :param encoding: The file encoding used to open the file.
+        :param encoding: The file encoding used to open_file the file.
         :return: An iterator over the rows in the file.
         """
         return self._connection.read_delimited(self, delimiter, quote, encoding)
@@ -1461,7 +1634,7 @@ class Path:
 
         :param delimiter: The delimiter used to separate fields in each record.
         :param quote: The quote character used to surround field values in the record.
-        :param encoding: The file encoding used to open the file.
+        :param encoding: The file encoding used to open_file the file.
         :return: A list containing the rows in the file.
         """
         return self._connection.load_delimited(self, delimiter, quote, encoding)
