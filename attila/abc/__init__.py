@@ -16,6 +16,6 @@ __all__ = [
     "configuration",
     "connections",
     "rpc",
-    "db.py",
+    "sql",
     "transactions",
 ]
