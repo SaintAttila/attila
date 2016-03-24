@@ -1,6 +1,9 @@
 from abc import ABCMeta, abstractmethod
 
-__author__ = 'Aaron Hosford'
+__all__ = [
+    "Connector",
+    "connection",
+]
 
 
 # TODO: Make the various *Info classes in this package inherit from this, and rename them to *Connector
