@@ -4,7 +4,10 @@ from . import files
 from .files import Path
 
 
-__author__ = 'Aaron Hosford'
+__all__ = [
+    'HTTPFSConnector',
+    'http_fs_connection',
+]
 
 
 class HTTPFSConnector(files.FSConnector):

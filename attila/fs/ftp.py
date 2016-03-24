@@ -13,10 +13,16 @@ import socket
 
 
 from . import files
-from . import security
-from . import strings
+from .. import security
+from .. import strings
 
 from .files import Path, ProxyFile
+
+
+__all__ = [
+    'FTPConnector',
+    'ftp_connection',
+]
 
 
 DEFAULT_FTP_PORT = 21
