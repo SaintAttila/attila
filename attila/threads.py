@@ -20,8 +20,8 @@ import win32event
 
 # This determines what gets imported by "from <module> import *" statements.
 __all__ = [
-    "Mutex",
-    "Semaphore",
+    "mutex",
+    "semaphore",
     "AsyncCall",
     "async",
 ]
@@ -56,10 +56,10 @@ def wait_for_handle(handle, timeout=None):
     status = win32event.WaitForSingleObject(handle, timeout_milliseconds)
 
     if status == win32con.WAIT_ABANDONED:  # AKA MUTEX_RELEASED_DUE_TO_PROGRAM_EXIT
-        # Mutex was acquired
+        # mutex was acquired
         return True
     elif status == win32con.WAIT_OBJECT_0:  # AKA MUTEX_RELEASED_NORMALLY
-        # Mutex was acquired
+        # mutex was acquired
         return True
     elif status == win32con.WAIT_TIMEOUT:  # AKA MUTEX_TIMED_OUT
         # Request timed out
@@ -75,7 +75,7 @@ def wait_for_handle(handle, timeout=None):
 
 
 # See http://code.activestate.com/recipes/577794-win32-named-mutex-class-for-system-wide-mutex/
-class Mutex:
+class mutex:
     """Mutex is short for "mutual exclusion". A mutex is an inter-process lock
     which only one running process can own at a time. To use a mutex, first
     create it. This does not lock the mutex; it simply creates an object to
@@ -172,7 +172,7 @@ class Mutex:
         required."""
         if self._held_count <= 0:
             self._held_count = 0  # Just in case it somehow ended up negative.
-            raise ValueError("Mutex " + repr(self._name) + " cannot be released because it is not held.")
+            raise ValueError("mutex " + repr(self._name) + " cannot be released because it is not held.")
         elif self._held_count > 1:
             self._held_count -= 1
         else:
@@ -194,9 +194,9 @@ class Mutex:
         return False  # Indicates that errors should NOT be suppressed.
 
 
-# TODO: This is a kludge built on top of Mutex. Revamp it to use the underlying Windows semaphore functionality for
+# TODO: This is a kludge built on top of mutex. Revamp it to use the underlying Windows semaphore functionality for
 #       greater efficiency.
-class Semaphore:
+class semaphore:
     """A semaphore is an inter-process lock which up to N running processes can
     own at a time. It is similar to a mutex, except that there
     are multiple, indistinguishable resources being guarded rather than just
@@ -248,13 +248,13 @@ class Semaphore:
 
         for index in range(self._max_count):
             if index >= len(self._mutexes):
-                mutex = Mutex(self._name + '/' + str(index))
-                self._mutexes.append(mutex)
+                held_mutex = mutex(self._name + '/' + str(index))
+                self._mutexes.append(held_mutex)
             else:
-                mutex = self._mutexes[index]
+                held_mutex = self._mutexes[index]
 
-            if mutex.lock(0):
-                self._held_mutex = mutex
+            if held_mutex.lock(0):
+                self._held_mutex = held_mutex
                 return True
 
         return False
