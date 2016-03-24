@@ -1,7 +1,10 @@
 from abc import ABCMeta, abstractmethod
 import configparser
 
-__author__ = 'Aaron Hosford'
+
+__all__ = [
+    "Configurable",
+]
 
 
 # TODO: Make the various configurable classes in this library inherit from this.
