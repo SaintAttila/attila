@@ -16,9 +16,9 @@ import win32gui
 import win32process
 
 
-import attila.processes
-import attila.strings
-import attila.threads
+from .processes import kill_process_family
+from .strings import glob_to_regex
+from .threads import wait_for_handle
 
 
 log = logging.getLogger(__name__)
@@ -87,7 +87,7 @@ def _force_close_window_callback(hwnd, title_regex):
             raise  # This is unexpected...
 
     # Wait for it to work.
-    attila.threads.wait_for_handle(hwnd, 10)
+    wait_for_handle(hwnd, 10)
 
     # Send a polite "quit program" message.
     log.debug("Sending WM_QUIT.")
@@ -102,12 +102,12 @@ def _force_close_window_callback(hwnd, title_regex):
             raise  # This is unexpected...
 
     # Wait for it to work.
-    attila.threads.wait_for_handle(hwnd, 10)
+    wait_for_handle(hwnd, 10)
 
     # Murder the process and all its children. We're done.
     log.debug("Killing process family.")
     thread_id, process_id = win32process.GetWindowThreadProcessId(hwnd)
-    attila.processes.kill_process_family(process_id, timeout=10)
+    kill_process_family(process_id, timeout=10)
 
 
 def force_close_windows(title_pattern):
@@ -119,5 +119,5 @@ def force_close_windows(title_pattern):
     """
     log.debug("Force-closing window(s) with title matching '%s'.", title_pattern)
     if not isinstance(title_pattern, REGEX_TYPE):
-        title_pattern = attila.strings.glob_to_regex(title_pattern)
+        title_pattern = glob_to_regex(title_pattern)
     win32gui.EnumWindows(_force_close_window_callback, title_pattern)
