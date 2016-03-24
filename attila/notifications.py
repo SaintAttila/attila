@@ -5,13 +5,14 @@ attila.notifications
 Base classes and null implementations for notification functionality.
 """
 
-from abc import ABCMeta, abstractmethod
-
 import configparser
 import datetime
 import keyword
 import logging
 import sys
+
+from abc import ABCMeta, abstractmethod
+
 
 from . import emails
 from . import plugins
