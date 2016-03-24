@@ -14,7 +14,7 @@ import win32com.client
 import win32con
 
 
-from attila.utility import only, TooFewItemsError
+from .utility import only, TooFewItemsError
 
 
 __all__ = [
