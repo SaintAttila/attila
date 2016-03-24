@@ -7,12 +7,11 @@ import shutil
 import stat
 import tempfile
 import time
-
 from abc import ABCMeta
 from configparser import ConfigParser
 
-from . import configuration
-from . import connections
+from .abc import connections
+from .abc import configuration
 
 log = logging.getLogger(__name__)
 
@@ -244,8 +243,8 @@ class ProxyFile(TempFile):
 
 class temp_cwd:
     """
-    All this class does is temporarily change the working directory of a file system connection, and then change it
-    back. It's meant for use in a with statement. It only exists to allow Paths to be used as context.
+    This class just temporarily changes the working directory of a file system connection, and then changes it
+    back. It's meant for use in a with statement. It only exists to allow Paths to be used as 'with' contexts.
     """
 
     def __init__(self, path):
@@ -626,7 +625,7 @@ class fs_connection(connections.connection, metaclass=ABCMeta):
         Return an iterator over the lines from the file.
 
         :param path: The path to operate on.
-        :param encoding: The file encoding used to open_file the file.
+        :param encoding: The file encoding used to open the file.
         :return: An iterator over the lines in the file, without newlines.
         """
         assert self.is_file(path)
@@ -642,7 +641,7 @@ class fs_connection(connections.connection, metaclass=ABCMeta):
         Returns a list containing the lines from the file.
 
         :param path: The path to operate on.
-        :param encoding: The file encoding used to open_file the file.
+        :param encoding: The file encoding used to open the file.
         :return: A list containing the lines in the file, without newlines.
         """
         return list(self.read(path, encoding))
@@ -654,7 +653,7 @@ class fs_connection(connections.connection, metaclass=ABCMeta):
         :param path: The path to operate on.
         :param delimiter: The delimiter used to separate fields in each record.
         :param quote: The quote character used to surround field values in the record.
-        :param encoding: The file encoding used to open_file the file.
+        :param encoding: The file encoding used to open the file.
         :return: An iterator over the rows in the file.
         """
         with self.open_file(path, encoding=encoding, newline='') as file_obj:
@@ -672,7 +671,7 @@ class fs_connection(connections.connection, metaclass=ABCMeta):
         :param path: The path to operate on.
         :param delimiter: The delimiter used to separate fields in each record.
         :param quote: The quote character used to surround field values in the record.
-        :param encoding: The file encoding used to open_file the file.
+        :param encoding: The file encoding used to open the file.
         :return: A list containing the rows in the file.
         """
         return list(self.read_delimited(path, delimiter, quote, encoding))
@@ -1603,7 +1602,7 @@ class Path:
         """
         Return an iterator over the lines from the file.
 
-        :param encoding: The file encoding used to open_file the file.
+        :param encoding: The file encoding used to open the file.
         :return: An iterator over the lines in the file, without newlines.
         """
         return self._connection.read(self, encoding)
@@ -1612,7 +1611,7 @@ class Path:
         """
         Returns a list containing the lines from the file.
 
-        :param encoding: The file encoding used to open_file the file.
+        :param encoding: The file encoding used to open the file.
         :return: A list containing the lines in the file, without newlines.
         """
         return self._connection.read(self, encoding)
@@ -1623,7 +1622,7 @@ class Path:
 
         :param delimiter: The delimiter used to separate fields in each record.
         :param quote: The quote character used to surround field values in the record.
-        :param encoding: The file encoding used to open_file the file.
+        :param encoding: The file encoding used to open the file.
         :return: An iterator over the rows in the file.
         """
         return self._connection.read_delimited(self, delimiter, quote, encoding)
@@ -1634,7 +1633,7 @@ class Path:
 
         :param delimiter: The delimiter used to separate fields in each record.
         :param quote: The quote character used to surround field values in the record.
-        :param encoding: The file encoding used to open_file the file.
+        :param encoding: The file encoding used to open the file.
         :return: A list containing the rows in the file.
         """
         return self._connection.load_delimited(self, delimiter, quote, encoding)
