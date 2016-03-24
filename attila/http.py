@@ -1,5 +1,4 @@
 import ctypes
-import time
 
 from . import files
 from .files import Path
