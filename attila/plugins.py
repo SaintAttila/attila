@@ -1,10 +1,21 @@
+import configparser
+
 import pkg_resources
 import warnings
 
 from collections.abc import Mapping
 
 
-__author__ = 'Aaron Hosford'
+__all__ = [
+    'PluginGroup',
+    'CHANNEL_TYPES',
+    'CHANNELS',
+    'NOTIFIER_TYPES',
+    'NOTIFIERS',
+    'load_plugins',
+    'load_channel_from_config',
+    'load_notifier_from_config',
+]
 
 
 class PluginGroup(Mapping):
@@ -90,7 +101,7 @@ NOTIFIER_TYPES = PluginGroup('attila.notifier_type', require_config_loader=True)
 NOTIFIERS = PluginGroup('attila.notifier')
 
 
-def _load_plugins(warn=True):
+def load_plugins(warn=True):
     """
     =============================================================================
     Load Attila Plugins
@@ -120,3 +131,31 @@ def _load_plugins(warn=True):
     CHANNELS.load(warn)
     NOTIFIER_TYPES.load(warn)
     NOTIFIERS.load(warn)
+
+
+def load_channel_from_config(config, section, default=NotImplemented):
+    assert isinstance(config, configparser.ConfigParser)
+    assert section and isinstance(section, str)
+    if section not in config and section in CHANNELS:
+        if default is NotImplemented:  # We use NotImplemented as a sentinel so None can be a legal default value.
+            return CHANNELS[section]
+        else:
+            return CHANNELS.get(section, default)
+    config_section = config[section]
+    channel_type_name = config_section['Channel Type']
+    channel_type = CHANNEL_TYPES[channel_type_name]
+    return channel_type.load_from_config(config, section)
+
+
+def load_notifier_from_config(config, section, default=NotImplemented):
+    assert isinstance(config, configparser.ConfigParser)
+    assert section and isinstance(section, str)
+    if section not in config and section in NOTIFIERS:
+        if default is NotImplemented:  # We use NotImplemented as a sentinel so None can be a legal default value.
+            return NOTIFIERS[section]
+        else:
+            return NOTIFIERS.get(section, default)
+    config_section = config[section]
+    notifier_type_name = config_section['Notifier Type']
+    notifier_type = CHANNEL_TYPES[notifier_type_name]
+    return notifier_type.load_from_config(config, section)
