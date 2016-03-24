@@ -1,8 +1,10 @@
 from abc import ABCMeta, abstractmethod
 
-from attila.abc import connections
+from . import connections
 
-__author__ = 'Aaron Hosford'
+__all__ = [
+    "rpc_connection",
+]
 
 
 # noinspection PyPep8Naming
