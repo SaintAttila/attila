@@ -10,8 +10,19 @@ import datetime
 import inspect
 import os
 
-
+import attila.plugins
 from . import notifications
+
+
+__all__ = [
+    'get_default_config_search_dirs',
+    'iter_search_paths',
+    'load_config',
+    'get_attila_config',
+    'get_automation_config',
+    'get_entry_point_name',
+    'automation_environment',
+]
 
 
 _CONFIG_EXTENSIONS = (
@@ -162,7 +173,7 @@ def get_entry_point_name(default=None):
     return result
 
 
-class AutomationEnvironment:
+class automation_environment:
     """
     Interface for automation processes to access environment and configuration settings.
     """
@@ -226,11 +237,11 @@ class AutomationEnvironment:
 
         # TODO: Load and use default notifiers.
         # TODO: Integrate these notifiers into the environment, so notifications are automatically sent at the appropriate times.
-        start_notifier = notifications.load_notifier_from_config(config, 'Start Notifier')  # Script start
-        success_notifier = notifications.load_notifier_from_config(config, 'Success Notifier')  # Script success (not necessarily terminated)
-        failure_notifier = notifications.load_notifier_from_config(config, 'Failure Notifier')  # Script failure (not necessarily terminated or an error)
-        error_notifier = notifications.load_notifier_from_config(config, 'Error Notifier')  # Script error (not necessarily terminated or a failure)
-        end_notifier = notifications.load_notifier_from_config(config, 'End Notifier')  # Script termination (not necessarily a success)
+        start_notifier = attila.plugins.load_notifier_from_config(config, 'Start Notifier')  # Script start
+        success_notifier = attila.plugins.load_notifier_from_config(config, 'Success Notifier')  # Script success (not necessarily terminated)
+        failure_notifier = attila.plugins.load_notifier_from_config(config, 'Failure Notifier')  # Script failure (not necessarily terminated or an error)
+        error_notifier = attila.plugins.load_notifier_from_config(config, 'Error Notifier')  # Script error (not necessarily terminated or a failure)
+        end_notifier = attila.plugins.load_notifier_from_config(config, 'End Notifier')  # Script termination (not necessarily a success)
 
         self._name = name
         self._config = config
