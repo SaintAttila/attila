@@ -1,6 +1,12 @@
 import sys
 
 
+__all__ = [
+    'error_response',
+    'ErrorHandler',
+]
+
+
 def error_response(response):
     """
     Decorator used to indicate a default error response function.
