@@ -1,7 +1,7 @@
 import wmi
 
 
-from attila.utility import only
+from .utility import only
 
 
 __author__ = 'Nick Denman'
