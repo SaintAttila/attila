@@ -23,7 +23,15 @@ from . import env
 from . import strings
 
 
-def validate_email(address):
+__all__ = [
+    'validate_email_address',
+    'is_valid_email_address',
+    'send_email',
+    'get_standard_footer',
+]
+
+
+def validate_email_address(address):
     """
     Validate an email address. If it is malformed, raise an exception.
 
@@ -41,7 +49,7 @@ def validate_email(address):
     return address
 
 
-def is_valid_email(address):
+def is_valid_email_address(address):
     """
     Determine whether an email address is valid.
 
@@ -50,7 +58,7 @@ def is_valid_email(address):
     """
     # noinspection PyBroadException
     try:
-        validate_email(address)
+        validate_email_address(address)
     except Exception:
         return False
     else:
@@ -76,14 +84,14 @@ def send_email(server, sender, subject, body, to, cc=None, bcc=None, attachments
 
     server, port = strings.split_port(server)
 
-    sender = validate_email(sender)
+    sender = validate_email_address(sender)
 
     assert isinstance(subject, str)
     assert isinstance(body, str)
 
-    to_sorted = sorted(set(strings.to_list_of_strings(to, normalizer=validate_email)))
-    cc_sorted = sorted(set(strings.to_list_of_strings(cc, normalizer=validate_email)))
-    bcc_sorted = sorted(set(strings.to_list_of_strings(bcc, normalizer=validate_email)))
+    to_sorted = sorted(set(strings.to_list_of_strings(to, normalizer=validate_email_address)))
+    cc_sorted = sorted(set(strings.to_list_of_strings(cc, normalizer=validate_email_address)))
+    bcc_sorted = sorted(set(strings.to_list_of_strings(bcc, normalizer=validate_email_address)))
     attachments_sorted = sorted(set(strings.to_list_of_strings(attachments)))
 
     message = email.mime.multipart.MIMEMultipart()
