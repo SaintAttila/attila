@@ -4,7 +4,10 @@ from collections import OrderedDict
 from . import rpc
 
 
-__author__ = 'Aaron Hosford'
+__all__ = [
+    "RecordSet",
+    "sql_connection",
+]
 
 
 class RecordSet(metaclass=ABCMeta):
