@@ -183,7 +183,7 @@ class ConfigLoader:
     A ConfigLoader provides the ability to load compound objects from a configuration file.
     """
 
-    def __init__(self, config, loaders=None):
+    def __init__(self, config, loaders=None, fallbacks=None):
         if isinstance(config, str):
             if os.path.isfile(config):
                 path = config
@@ -198,15 +198,48 @@ class ConfigLoader:
                 config.read_file(file)
         verify_type(config, configparser.ConfigParser)
 
+        fallbacks = tuple(fallbacks or ())
+        for fallback in fallbacks:
+            verify_type(fallback, ConfigLoader)
+
         self._config = config
         self._loaders = plugins.CONFIG_LOADERS if loaders is None else loaders
         self._loaded_instances = {}
+        self._fallbacks = fallbacks
 
     @property
     def loaders(self):
         """A mapping (dictionary-like object) which maps from loader names to arbitrary functions or
         subclasses of Configurable which can be used to load options or sections from a config file."""
         return self._loaders
+
+    @property
+    def fallbacks(self):
+        """The other ConfigLoaders that are used for default values when none is provided."""
+        return self._fallbacks
+
+    def has_option(self, section, option):
+        """
+        Determine whether the given option exists.
+
+        :param section: The name of the section where the option must appear.
+        :param option: The name of the option.
+        :return: Whether or not the option exists.
+        """
+        if self._config.has_option(section, option):
+            return True
+        return any(fallback.has_option(section, option) for fallback in self._fallbacks)
+
+    def has_section(self, section):
+        """
+        Determine whether the given section exists.
+
+        :param section: The name of the section.
+        :return: Whether or not the section exists.
+        """
+        if self._config.has_section(section):
+            return True
+        return any(fallback.has_section(section) for fallback in self._fallbacks)
 
     def load_value(self, value, loader=None):
         """
@@ -257,8 +290,13 @@ class ConfigLoader:
         verify_type(section, str, non_empty=True)
         verify_type(option, str, non_empty=True)
 
-        if not self._config.has_option(section, option) and default is not NotImplemented:
-            return default
+        if not self._config.has_option(section, option):
+            for fallback in self._fallbacks:
+                assert isinstance(fallback, ConfigLoader)
+                if fallback.has_option(section, option):
+                    return fallback.load_option(section, option, loader)
+            if default is not NotImplemented:
+                return default
 
         content = self._config[section][option]
 
@@ -306,8 +344,13 @@ class ConfigLoader:
         """
         verify_type(section, str, non_empty=True)
 
-        if not self._config.has_section(section) and default is not NotImplemented:
-            return default
+        if not self._config.has_section(section):
+            for fallback in self._fallbacks:
+                assert isinstance(fallback, ConfigLoader)
+                if fallback.has_section(section):
+                    return fallback.load_section(section, loader)
+            if default is not NotImplemented:
+                return default
 
         content = self._config[section]
 
