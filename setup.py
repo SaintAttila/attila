@@ -26,6 +26,7 @@ try:
         install_requires=[
             # 3rd-party:
             'appdirs',
+            'cryptography',
 
             # In-house:
         ],
