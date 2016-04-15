@@ -1,45 +1,55 @@
-from ..abc.notifications import Channel, Notifier
+from ..abc.configurations import Configurable
+from ..abc.notifications import Notifier
+from ..configurations import ConfigLoader
+from ..exceptions import verify_type
 
 
 __all__ = [
-    'NullChannel',
     'NullNotifier',
 ]
 
 
-class NullChannel(Channel):
+class NullNotifier(Notifier, Configurable):
     """
-    A null channel simply drops all incoming notifications, regardless of their type or content. It's useful as a
+    A null notifier simply drops all requested notifications, regardless of their content. It's useful as a
     placeholder for notifications that have been turned off.
     """
 
-    def send(self, notification):
+    @classmethod
+    def load_config_value(cls, config_loader, value, *args, **kwargs):
         """
-        Send a notification on this channel.
+        Load a class instance from the value of a config option.
 
-        :param notification: The notification to be sent on this channel.
-        :return: None
+        :param config_loader: A ConfigLoader instance.
+        :param value: The string value of the option.
+        :return: A new instance of this class.
         """
-        pass  # Just ignore the notification, without complaint.
+        verify_type(config_loader, ConfigLoader)
+        verify_type(value, str)
 
+        assert value.lower() in ('', 'null', 'none')
 
-class NullNotifier(Notifier):
-    """
-    A null notifier simply drops all requested notifications, regardless of their content. It's useful as a placeholder
-    for notifications that have been turned off.
-    """
+        return cls(*args, **kwargs)
 
-    def __init__(self, channel=None):
-        super().__init__(channel or NullChannel())
-
-    def build_notification(self, *args, **kwargs):
+    @classmethod
+    def load_config_section(cls, config_loader, section, *args, **kwargs):
         """
-        Construct a null notification from the arguments passed to the send() method.
-        """
-        return None
+        Load a class instance from a config section.
 
-    def send(self, *args, **kwargs):
+        :param config_loader: A ConfigLoader instance.
+        :param section: The name of the section.
+        :return: A new instance of this class.
+        """
+        verify_type(config_loader, ConfigLoader)
+        assert isinstance(config_loader, ConfigLoader)
+        verify_type(section, str, non_empty=True)
+
+        pass  # Nothing to configure...
+
+        return cls(*args, **kwargs)
+
+    def send(self, *args, attachments=None, **kwargs):
         """
         Build and send a notification on this notifier's channel.
         """
-        pass  # Just ignore all requests, without complaint.
+        pass  # Just ignore all requests, without action or complaint.

@@ -1,8 +1,8 @@
 """
-attila.emails
+attila.support.emails
 =============
 
-Email notification functionality.
+Provides support-level functionality for email notifiers.
 """
 
 
@@ -19,8 +19,8 @@ import socket
 import textwrap
 
 
-from . import env
-from . import strings
+from attila import env
+from attila import strings
 
 
 __all__ = [
@@ -29,6 +29,9 @@ __all__ = [
     'send_email',
     'get_standard_footer',
 ]
+
+
+DEFAULT_EMAIL_PORT = 25
 
 
 def validate_email_address(address):
@@ -67,7 +70,7 @@ def is_valid_email_address(address):
 
 def send_email(server, sender, subject, body, to, cc=None, bcc=None, attachments=None, html=False):
     """
-    Send an email. This does not add a footer or provide any other automatic formatting or functionality; it literally
+    Send an email. This does not add a add_footer or provide any other automatic formatting or functionality; it literally
     just sends an email.
 
     :param server: The email server address.
@@ -78,11 +81,11 @@ def send_email(server, sender, subject, body, to, cc=None, bcc=None, attachments
     :param cc: The email address(es) to receive carbon copies.
     :param bcc: The email address(es) to receive blind carbon copies.
     :param attachments: The files to attach.
-    :param html: Whether the body is html, as opposed to plain text.
+    :param html: Whether the body is use_html, as opposed to plain text.
     :return: The email object.
     """
 
-    server, port = strings.split_port(server)
+    server, port = strings.split_port(server, DEFAULT_EMAIL_PORT)
 
     sender = validate_email_address(sender)
 
@@ -107,7 +110,7 @@ def send_email(server, sender, subject, body, to, cc=None, bcc=None, attachments
         message.attach(attachment_obj)
 
     # Add body
-    body_obj = email.mime.text.MIMEText(body, 'html' if html else 'plain')
+    body_obj = email.mime.text.MIMEText(body, 'use_html' if html else 'plain')
     message.attach(body_obj)
 
     # Add header info
@@ -127,10 +130,10 @@ def send_email(server, sender, subject, body, to, cc=None, bcc=None, attachments
 
 def get_standard_footer():
     """
-    Generates a standard footer for all automated emails that includes account, server, time stamp, and system (code
+    Generates a standard add_footer for all automated emails that includes account, server, time stamp, and system (code
     entry point).
 
-    :return: A footer, as a string.
+    :return: A add_footer, as a string.
     """
 
     system = env.get_entry_point_name('UNKNOWN')
@@ -138,7 +141,7 @@ def get_standard_footer():
     server = socket.gethostname()
     timestamp = datetime.datetime.now().strftime('%m/%d/%Y %I:%M:%S %p')
 
-    # The default footer template. We wrap it in a call to textwrap.dedent
+    # The default add_footer template. We wrap it in a call to textwrap.dedent
     # because triple-quoted strings preserve indentation.
     template = textwrap.dedent(
         """
@@ -152,7 +155,7 @@ def get_standard_footer():
         """
     )
 
-    # Try to load the footer template from the automation config.
+    # Try to load the add_footer template from the automation config.
     # If it can't be found, just use the default provided above.
     config = env.get_automation_config()
     if 'Email' in config:

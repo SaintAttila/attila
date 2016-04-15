@@ -1,37 +1,64 @@
 """
-attila.tracking
-===============
+attila.context
+==============
 
 Automation time/activity tracking.
 
 """
 
 
+import datetime
 import logging
+
+__all__ = [
+    'TaskType',
+    'Task',
+    'Tracker',
+    'activity',
+]
 
 log = logging.getLogger(__name__)
 
 
-# TODO: Provide a ScriptContext class that sets up logging, error handling, etc. automatically with a single 'with'
-#       statement, and just use the built-in Python logging module's functionality instead of BaseLog. This new class
-#       will supplant BaseLoad.
+# TODO: Provide a ScriptContext class that sets up logging, error handling, etc. automatically with a
+#       single 'with' statement, and just use the built-in Python logging module's functionality instead
+#       of BaseLog. This new class will supplant BaseLoad.
 
 
 class TaskType:
 
-    def __init__(self, name, savings_per, cost_center_id, time_types, time_thresholds, cutoff, profile, override_savings):
-        ...
+    def __init__(self, name, savings_per, cost_center_id, time_types, time_thresholds, cutoff, profile,
+                 override_savings):
+        self.name = name
+        self.savings_per = savings_per
+        self.cost_center_id = cost_center_id
+        self.time_types = time_types
+        self.time_thresholds = time_thresholds
+        self.cutoff = cutoff
+        self.profile = profile
+        self.override_savings = override_savings
 
 
 class Task:
 
-    def __init__(self, task_type, start_time):
+    def __init__(self, tracker, task_type, start_time=None):
+        assert isinstance(tracker, Tracker)
+        assert isinstance(task_type, TaskType)
+        if start_time is None:
+            start_time = datetime.datetime.now()
+        else:
+            assert isinstance(start_time, datetime.datetime)
+        self.task_type = task_type
+        self.start_time = start_time
+        self._finished = False
 
     def __del__(self):
         if not self._finished:
             self.finish(successful=False)
 
     def finish(self, successful=True):
+        # TODO: Notify the tracker so the task's completion can be documented.
+        self._finished = True
 
     def __enter__(self):
         return self
@@ -48,29 +75,31 @@ class Tracker:
     def start(self, task_type):
         # Return a new task of the given type
 
+    def
 
-class Activity:
+
+class activity:
     """
-    Use with the 'with' statement to automatically track what activity is being performed. Use logging flags to
-    control what events are logged.
+    Use with the 'with' statement to automatically track what activity is being performed. Use logging
+    flags to control what events are logged.
 
     Example Usage:
-        with Activity("Doing stuff..."):
+        with activity("Doing stuff..."):
             print("Now I'm doing stuff.")
 
-            with Activity("Doing more detailed stuff..."):
+            with activity("Doing more detailed stuff..."):
                 print("This is getting complicated.")
 
-    If and when an error occurs, the nested tasks that were failed will be automatically logged. Logging also takes
-    place automatically when the with block is entered and exited cleanly. The default log levels can be set at the
-    class level:
+    If and when an error occurs, the nested tasks that were failed will be automatically logged. Logging
+    also takes place automatically when the with block is entered and exited cleanly. The default log
+    levels can be set at the class level:
 
-        Activity.enter_log_level = logging.DEBUG
-        Activity.exit_log_level = logging.INFO
-        Activity.error_log_level = logging.CRITICAL
+        activity.enter_log_level = logging.DEBUG
+        activity.exit_log_level = logging.INFO
+        activity.error_log_level = logging.CRITICAL
 
-    This is handy for testing and debugging, when more in-depth logging is needed, since a lot of normally unnecessary
-    logging can be turned on/off with a single switch.
+    This is handy for testing and debugging, when more in-depth logging is needed, since a lot of normally
+    unnecessary logging can be turned on/off with a single switch.
     """
 
     # Defaults for all class instances:
@@ -79,7 +108,8 @@ class Activity:
     error_log_level = logging.ERROR
     logger = logging.getLogger("activity")
 
-    def __init__(self, description, logger=None, enter_log_level=None, exit_log_level=None, error_log_level=None):
+    def __init__(self, description, logger=None, enter_log_level=None, exit_log_level=None,
+                 error_log_level=None):
         self.description = str(description)
 
         # Overrides for this instance, only:

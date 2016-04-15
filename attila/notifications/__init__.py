@@ -4,26 +4,21 @@ attila.notifications
 
 Built-in notification-related types and instances.
 """
-
-
-from ..abc.notifications import Notification, Channel, Notifier
+import attila.notifications.files
+from ..abc.notifications import Notifier
 from . import emails
 from . import null
-from . import raw
+from . import callbacks
 
 
+# TODO: Replace Channels with Connectors and then rename Notifiers to Channels.
 __all__ = [
-    'Notification',
-    'Channel',
     'Notifier',
     'emails',
     'null',
-    'raw',
-    'NULL_CHANNEL',
+    'callbacks',
     'NULL_NOTIFIER',
-    'STDOUT_CHANNEL',
     'STDOUT_NOTIFIER',
-    'STDERR_CHANNEL',
     'STDERR_NOTIFIER',
 ]
 
@@ -35,7 +30,7 @@ __all__ = [
 # automations built using attila.
 NULL_CHANNEL = null.NullChannel()
 NULL_NOTIFIER = null.NullNotifier()
-STDOUT_CHANNEL = raw.FileChannel('stdout')
-STDOUT_NOTIFIER = raw.RawNotifier(STDOUT_CHANNEL)
-STDERR_CHANNEL = raw.FileChannel('stderr')
-STDERR_NOTIFIER = raw.RawNotifier(STDERR_CHANNEL)
+STDOUT_CHANNEL = attila.notifications.files.FileNotifier('stdout')
+STDOUT_NOTIFIER = callbacks.RawNotifier(STDOUT_CHANNEL)
+STDERR_CHANNEL = attila.notifications.files.FileNotifier('stderr')
+STDERR_NOTIFIER = callbacks.RawNotifier(STDERR_CHANNEL)

@@ -1,7 +1,15 @@
+"""
+attila.abc.sql
+==============
+
+Interface definition for SQL connections.
+"""
+
+
 from abc import ABCMeta, abstractmethod
-from collections import OrderedDict
 
 from . import rpc
+from ..exceptions import OperationNotSupportedError
 
 
 __all__ = [
@@ -13,7 +21,7 @@ __all__ = [
 class RecordSet(metaclass=ABCMeta):
     """
     A RecordSet is returned whenever a query is executed. It provides an interface to the selected data. Each row is
-    yielded as an OrderedDict.
+    yielded as a tuple.
     """
 
     @abstractmethod
@@ -27,19 +35,18 @@ class RecordSet(metaclass=ABCMeta):
         raise NotImplementedError()
 
     def __next__(self):
-        result = self._next()
-        assert isinstance(result, OrderedDict)
-        yield result
+        return tuple(self._next())
 
     def __iter__(self):
         while True:
-            result = self._next()
-            assert isinstance(result, OrderedDict)
-            yield result
+            yield tuple(self._next())
 
 
 # noinspection PyPep8Naming
 class sql_connection(rpc.rpc_connection, metaclass=ABCMeta):
+    """
+    The sql_connection class is an abstract base class for connections to SQL servers.
+    """
 
     @abstractmethod
     def _execute(self, script):
@@ -49,7 +56,7 @@ class sql_connection(rpc.rpc_connection, metaclass=ABCMeta):
         :param script: The script to execute.
         :return: The results, or None.
         """
-        raise NotImplementedError()
+        raise OperationNotSupportedError()
 
     @abstractmethod
     def _call(self, name, *args, **kwargs):
@@ -61,7 +68,7 @@ class sql_connection(rpc.rpc_connection, metaclass=ABCMeta):
         :param kwargs: Named arguments to be passed to the remote procedure.
         :return: The results, or None.
         """
-        raise NotImplementedError()
+        raise OperationNotSupportedError()
 
     def execute(self, script):
         """
@@ -70,6 +77,7 @@ class sql_connection(rpc.rpc_connection, metaclass=ABCMeta):
         :param script: The script to execute.
         :return: The results, or None.
         """
+        self.verify_open()
         result = self._execute(script)
         assert result is None or isinstance(result, RecordSet)
         return result
@@ -83,6 +91,7 @@ class sql_connection(rpc.rpc_connection, metaclass=ABCMeta):
         :param kwargs: Named arguments to be passed to the remote procedure.
         :return: The results, or None.
         """
+        self.verify_open()
         result = self._call(name, *args, **kwargs)
         assert result is None or isinstance(result, RecordSet)
         return result

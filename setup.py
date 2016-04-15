@@ -31,10 +31,10 @@ try:
         ],
         entry_points={
             'attila.channel_type': [
-                'callback = attila.notifications:CallbackChannel',
-                'log = attila.notifications:LogChannel',
-                'file = attila.notifications:FileChannel',
-                'email = attila.notifications:EmailChannel',
+                'callback = attila.notifications:CallbackNotifier',
+                'log = attila.notifications:LogNotifier',
+                'file = attila.notifications:FileNotifier',
+                'email = attila.notifications:EmailConnector',
             ],
             'attila.channel': [
                 'null = attila.notifications:NULL_CHANNEL',

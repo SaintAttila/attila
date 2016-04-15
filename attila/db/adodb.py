@@ -1,22 +1,21 @@
 """
-attila.adodb
-============
+attila.db.adodb
+===============
 
 ADODB database interface for Python
 """
-
-import configparser
-
-from collections import OrderedDict
 
 
 import win32com.client
 
 
 from ..abc import connections
-from ..abc import configuration
+from ..abc import configurations
 from ..abc import sql
 from ..abc import transactions
+
+from ..configurations import ConfigLoader
+from ..exceptions import verify_type
 
 
 __all__ = [
@@ -29,7 +28,8 @@ __all__ = [
 class Constants:
     """
     Microsoft-defined constants for use with ADODB. These have the original names (as ugly as they are) preserved for
-    Googling convenience. They are not meant to be exported as part of this module's public interface.
+    Googling convenience. They are not meant to be exported as part of this module's public interface and should only
+    be used here within this module.
     """
 
     # Cursor locations
@@ -65,40 +65,176 @@ class ADODBRecordSet(sql.RecordSet):
         if self._com_object.EOF or self._com_object.BOF:
             raise StopIteration()
 
-        # We should never expose the raw COM object at all. Grab the values out and convert them to an ordered
-        # dictionary instead. An ordered dictionary is just like an ordinary dict, except that when you iterate
-        # over its keys, values, or items, the original order is preserved.
-        result = OrderedDict((field.Name, field.Value) for field in self._com_object.Fields)
+        # We should never expose the raw COM object at all. Grab the values out and put them in a tuple instead.
+        result = tuple(field.Value for field in self._com_object.Fields)
 
         self._com_object.MoveNext()
         return result
 
 
-class ADODBConnector(connections.Connector, configuration.Configurable):
+class ADODBConnector(connections.Connector, configurations.Configurable):
     """
-    Stores the ADODB connection information for a database as a single object which can then be passed around instead of
-    using multiple parameters to a function. Use str(connector) to get the actual connection string.
+    Stores the ADODB new_instance information for a database as a single object which can then be passed around instead
+    of using multiple parameters to a function. Use str(connector) to get the actual new_instance string.
     """
 
-    def __init__(self, server=None, database=None, driver=None, credential=None, trusted=None):
-        if server is not None:
-            assert isinstance(server, str)
-            assert server
+    @staticmethod
+    def _tokenize(string_value):
+        token = ''
+        in_braces = False
+        for char in string_value:
+            if in_braces:
+                if char == '}':
+                    in_braces = False
+                    yield token
+                    token = ''
+                else:
+                    token += char
+            elif char == '{':
+                if token:
+                    yield token
+                    token = ''
+                in_braces = True
+            elif char in ('=', ';'):
+                if token:
+                    yield token
+                    token = ''
+                yield char
+            else:
+                token += char
+        assert not in_braces
+        if token:
+            yield token
 
-        if database is not None:
-            assert isinstance(database, str)
-            assert database
+    @classmethod
+    def _parse(cls, string_value):
+        key = None
+        equals = False
+        value = None
+        results = {}
+        for token in cls._tokenize(string_value):
+            if token == '=':
+                assert key and not equals and value is None
+                equals = True
+            elif token == ';':
+                assert key and equals and value
+                key = key.lower()
+                assert key not in results
+                results[key] = value
+                key = None
+                equals = False
+                value = None
+            elif key is None:
+                assert not equals and value is None
+                key = token
+            else:
+                assert key and equals and value
+                value = token
+        if key is not None:
+            assert key and equals and value
+            key = key.lower()
+            assert key not in results
+            results[key] = value
+        return results
 
-        if driver is not None:
-            assert isinstance(driver, str)
-            assert driver
+    @classmethod
+    def load_config_value(cls, config_loader, value, *args, **kwargs):
+        """
+        Load a class instance from the value of a config option.
 
-        assert not credential or (credential.user and credential.password)
+        :param config_loader: A ConfigLoader instance.
+        :param value: The string value of the option.
+        :return: A new instance of this class.
+        """
+        verify_type(config_loader, ConfigLoader)
+        assert isinstance(config_loader, ConfigLoader)
+
+        verify_type(value, str, non_empty=True)
+
+        parameter_map = cls._parse(value)
+
+        # We specifically disallow passwords to be stored. It's a major security risk.
+        assert 'password' not in parameter_map and 'pwd' not in parameter_map
+
+        # We also want to catch any other, unfamiliar terms.
+        for key in parameter_map:
+            if key not in {'server', 'database', 'driver', 'trusted_connection', 'uid'}:
+                raise KeyError("Unrecognized term: " + repr(key))
+
+        server = parameter_map['server']
+        database = parameter_map['database']
+        driver = parameter_map.get('driver')
+        trusted = parameter_map.get('trusted_connection')
+        user = parameter_map.get('uid')
 
         if trusted is not None:
-            assert trusted in (0, 1, False, True)
-            trusted = bool(trusted)
-            assert not trusted or not credential
+            trusted = trusted.lower()
+            assert trusted in ('true', 'false')
+            trusted = (trusted == 'true')
+
+        if user is not None:
+            credential_string = user + '@' + server + '/adodb'
+            credential = config_loader.load_value(credential_string, 'Credential')
+        else:
+            credential = None
+
+        return cls(
+            *args,
+            server=server,
+            database=database,
+            driver=driver,
+            credential=credential,
+            trusted=trusted,
+            **kwargs
+        )
+
+    @classmethod
+    def load_config_section(cls, config_loader, section, *args, **kwargs):
+        """
+        Load a class instance from a config section.
+
+        :param config_loader: A ConfigLoader instance.
+        :param section: The name of the section.
+        :return: A new instance of this class.
+        """
+        verify_type(config_loader, ConfigLoader)
+        assert isinstance(config_loader, ConfigLoader)
+
+        verify_type(section, str, non_empty=True)
+
+        server = config_loader.load_option(section, 'Server', str)
+        database = config_loader.load_option(section, 'Database', str)
+        driver = config_loader.load_option(section, 'Driver', str, default=None)
+        trusted = config_loader.load_option(section, 'Trusted', str, default=None)
+
+        credential = config_loader.load_option(section, 'Credential', 'Credential', default=None)
+        if credential is None:
+            credential = config_loader.load_section(section, loader='Credential', default=None)
+
+        return cls(
+            *args,
+            server=server,
+            database=database,
+            driver=driver,
+            credential=credential,
+            trusted=trusted,
+            **kwargs
+        )
+
+    def __init__(self, server, database, driver=None, credential=None, trusted=None):
+        verify_type(server, str, non_empty=True)
+        verify_type(database, str, non_empty=True)
+
+        if driver is not None:
+            verify_type(driver, str, non_empty=True)
+
+        if credential and not (credential.user and credential.password):
+            raise ValueError("Partially defined credential.")
+
+        if trusted is not None:
+            verify_type(trusted, bool)
+            if trusted and credential:
+                raise ValueError("Connection cannot both be trusted and use credentials.")
 
         super().__init__(adodb_connection)
 
@@ -108,67 +244,47 @@ class ADODBConnector(connections.Connector, configuration.Configurable):
         self._credential = credential if credential else None
         self._trusted = trusted
 
-    def is_configured(self):
-        return self._server is not None and self._database is not None
-
-    def configure(self, config, section):
-        assert isinstance(config, configparser.ConfigParser)
-        assert section and isinstance(section, str)
-
-        super().configure(config, section)
-
-        config_section = config[section]
-
-        server = config_section['Server']
-        database = config_section['Database']
-        driver = config_section.get('Driver', self._driver)
-        trusted = config.getboolean(section, 'Trusted', fallback=None)
-
-        # This has to be imported here because the security module depends on this module, and we would get an import
-        # cycle otherwise.
-        import attila.security
-
-        # If no credentials are specified, this will simply return an empty credential.
-        credential = attila.security.Credential.load_from_config(config, section)
-
-        assert server
-        assert database
-
-        assert not credential or (credential.user and credential.password)
-
-        if trusted is not None:
-            assert trusted in (0, 1, False, True)
-            trusted = bool(trusted)
-            assert not trusted or not credential
-
-        self._server = server
-        self._database = database
-        self._driver = driver or 'SQL Server'
-        self._credential = credential
-        self._trusted = trusted
-
     @property
     def server(self):
+        """The DNS name or IP of the server being accessed."""
         return self._server
 
     @property
     def database(self):
+        """The name of the database being accessed."""
         return self._database
 
     @property
     def driver(self):
+        """The name of the driver used to connect to the server."""
         return self._driver
 
     @property
     def credential(self):
+        """The credential object used to connect to the server."""
         return self._credential
 
     @property
     def trusted(self):
+        """Whether the new_instance is "trusted"."""
         return self._trusted
 
-    def connection(self, command_timeout=None, connection_timeout=None, auto_reconnect=True, cursor_location=None):
-        return super().connection(command_timeout, connection_timeout, auto_reconnect, cursor_location)
+    def connect(self, command_timeout=None, connection_timeout=None, auto_reconnect=True, cursor_location=None):
+        """
+        Create a new new_instance and return it. The new_instance is not automatically opened.
+
+        :param command_timeout: The number of seconds to wait for a command to execute.
+        :param connection_timeout: The number of seconds to wait for a new_instance attempt to succeed.
+        :param auto_reconnect: Whether to automatically reconnect if the new_instance is broken.
+        :param cursor_location: The initial cursor location.
+        :return: The new, unopened new_instance.
+        """
+        return super().connect(
+            command_timeout=command_timeout,
+            connection_timeout=connection_timeout,
+            auto_reconnect=auto_reconnect,
+            cursor_location=cursor_location
+        )
 
     def __str__(self):
         result = "Driver={%s};Server={%s};Database={%s}" % (self._driver, self._server, self._database)
@@ -195,6 +311,10 @@ class ADODBConnector(connections.Connector, configuration.Configurable):
 
 # noinspection PyPep8Naming
 class adodb_connection(sql.sql_connection, transactions.transactional_connection):
+    """
+    An adodb_connection manages the state for a new_instance to a SQL server via ADODB, providing an interface for
+    executing queries and commands.
+    """
 
     def __init__(self, connector, command_timeout=None, connection_timeout=None, auto_reconnect=True,
                  cursor_location=None):
@@ -202,9 +322,9 @@ class adodb_connection(sql.sql_connection, transactions.transactional_connection
         Create a new adodb_connection instance.
 
         Example:
-            # Get a connection to the database with a command timeout of 100 seconds
-            # and a connection timeout of 10 seconds.
-            connection = adodb_connection(connector, 100, 10)
+            # Get a new_instance to the database with a command timeout of 100 seconds
+            # and a new_instance timeout of 10 seconds.
+            new_instance = adodb_connection(connector, 100, 10)
         """
 
         assert isinstance(connector, ADODBConnector)
@@ -219,7 +339,7 @@ class adodb_connection(sql.sql_connection, transactions.transactional_connection
         else:
             self._command_timeout = command_timeout
 
-        # The connection timeout is how long we're allowed to take to *establish* a connection.
+        # The new_instance timeout is how long we're allowed to take to *establish* a new_instance.
         if connection_timeout is None:
             self._connection_timeout = 60  # Default is 1 minute
         else:
@@ -231,9 +351,11 @@ class adodb_connection(sql.sql_connection, transactions.transactional_connection
 
     @property
     def is_open(self):
+        """Whether the new_instance is currently open."""
         return self._com_object is not None and bool(self._com_object.State & Constants.adStateOpen)
 
     def open(self):
+        """Open the ADODB new_instance."""
         super().open()
 
         # The state may have other bits set, but we only care about the one that indicates whether it's open or not.
@@ -250,20 +372,22 @@ class adodb_connection(sql.sql_connection, transactions.transactional_connection
         self._com_object.Open(str(self._connector))
 
     def close(self):
-        """Close the ADODB connection"""
+        """Close the ADODB new_instance"""
         return self._com_object.Close()
 
     def begin(self):
         """Begin a new transaction, returning the transaction nesting depth."""
-        self.open()
+        assert self.is_open
         return self._com_object.BeginTrans()
 
     def commit(self):
         """End the current transaction."""
+        assert self.is_open
         return self._com_object.CommitTrans()
 
     def rollback(self):
         """Rollback the current transaction."""
+        assert self.is_open
         return self._com_object.RollbackTrans()
 
     def _execute_raw(self, command):
@@ -306,8 +430,8 @@ class adodb_connection(sql.sql_connection, transactions.transactional_connection
         or converted to read depending on how the stored procedure handles its data.
 
         Example:
-            # Execute a stored procedure with 2 parameters from an open connection.
-            connection.call(stored_procedure_name, year_str, month_str)
+            # Execute a stored procedure with 2 parameters from an open new_instance.
+            new_instance.call(stored_procedure_name, year_str, month_str)
 
         :param name: The name of the stored procedure to execute.
         :param parameters: Additional parameters to be passed to the stored procedure.

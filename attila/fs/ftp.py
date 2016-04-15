@@ -2,21 +2,24 @@
 attila.ftp
 ==========
 
-File Transfer Protocol functionality
+FTP file system support
 """
 
 
-import configparser
 import ftplib
 import os
 import socket
 
+from distutils.util import strtobool
+from urllib.parse import urlparse
 
-from . import files
-from .. import security
 from .. import strings
+from . import local
 
-from .files import Path, ProxyFile
+from ..abc.files import Path, FSConnector, fs_connection
+from .proxies import ProxyFile
+from ..configurations import ConfigLoader
+from ..exceptions import verify_type
 
 
 __all__ = [
@@ -28,49 +31,98 @@ __all__ = [
 DEFAULT_FTP_PORT = 21
 
 
-class FTPConnector(files.FSConnector):
+class FTPConnector(FSConnector):
     """
-    Stores the FTP connection information as a single object which can then be passed around instead of using multiple
+    Stores the FTP new_instance information as a single object which can then be passed around instead of using multiple
     parameters to a function.
     """
 
-    def __init__(self, server=None, credential=None, passive=True, initial_cwd=None):
-        if server is None:
-            port = DEFAULT_FTP_PORT
+    @classmethod
+    def load_url(cls, config_loader, url):
+        """
+        Load a new Path instance from a URL string.
+
+        The standard format for an FTP URL is "ftp://user:password@host:port/path". However, storing of plaintext
+        passwords in parameters is not permitted, so the format is "ftp://user@host:port/path", where the password is
+        automatically loaded from the password database.
+
+        :param config_loader: The ConfigLoader instance.
+        :param url: The URL to load.
+        :return: The resultant Path instance.
+        """
+        verify_type(config_loader, ConfigLoader)
+        verify_type(url, str)
+
+        if '://' not in url:
+            url = 'ftp://' + url
+        scheme, netloc, path, params, query, fragment = urlparse(url)
+        assert not params and not query and not fragment
+        assert scheme.lower() == 'ftp'
+        assert '@' in netloc
+
+        user, address = netloc.split('@')
+
+        if ':' in address:
+            server, port = address.split(':')
+            port = int(port)
         else:
-            assert isinstance(server, str)
-            assert server
-            server, port = strings.split_port(server, DEFAULT_FTP_PORT)
-        if credential is not None:
-            assert credential.user and credential.password
-        assert passive == bool(passive)
+            server = address
+            port = DEFAULT_FTP_PORT
+
+        # We do not permit passwords to be stored in plaintext in the parameter value.
+        assert ':' not in user
+
+        credential_string = user + '@' + server + '/ftp'
+        credential = config_loader.load_value(credential_string, 'Credential')
+
+        return Path(path, cls(server + ':' + str(port), credential).connect())
+
+    @classmethod
+    def load_config_section(cls, config_loader, section, *args, **kwargs):
+        """
+        Load a new instance from a config section on behalf of a config loader.
+
+        :param config_loader: An attila.configurations.ConfigLoader instance.
+        :param section: The name of the section being loaded.
+        :return: An instance of this type.
+        """
+        verify_type(config_loader, ConfigLoader)
+        assert isinstance(config_loader, ConfigLoader)
+
+        verify_type(section, str, non_empty=True)
+
+        server = config_loader.load_option(section, 'Server', str)
+        port = config_loader.load_option(section, 'Port', int, None)
+        passive = bool(config_loader.load_option(section, 'Passive', strtobool, False))
+        credential = config_loader.load_section(section, 'Credential')
+
+        if port is not None:
+            server = server + ':' + str(port)
+
+        return super().load_config_section(
+            config_loader,
+            section,
+            *args,
+            server=server,
+            credential=credential,
+            passive=passive,
+            **kwargs
+        )
+
+    def __init__(self, server, credential, passive=True, initial_cwd=None):
+        verify_type(server, str, non_empty=True)
+        server, port = strings.split_port(server, DEFAULT_FTP_PORT)
+
+        assert credential.user and credential.password
+
+        verify_type(passive, bool)
 
         super().__init__(ftp_connection, initial_cwd)
 
         self._server = server
         self._port = port
-        self._credential = credential if credential else None
-        self._passive = passive
-
-    def is_configured(self):
-        return self._server is not None and self._credential is not None
-
-    def configure(self, config, section):
-        assert isinstance(config, configparser.ConfigParser)
-        assert section and isinstance(section, str)
-
-        super().configure(config, section)
-
-        config_section = config[section]
-
-        server = config_section['Server']
-        passive = config.getboolean(section, 'Passive', fallback=True)
-
-        credential = security.Credential.load_from_config(config, section)
-
-        self._server, self._port = strings.split_port(server, DEFAULT_FTP_PORT)
-        self._passive = passive
         self._credential = credential
+        self._passive = passive
 
     def __repr__(self):
         server_string = None
@@ -85,34 +137,43 @@ class FTPConnector(files.FSConnector):
 
     @property
     def server(self):
+        """The DNS name or IP address of the remote server."""
         return self._server
 
     @property
     def port(self):
+        """The remote server's port."""
         return self._port
 
     @property
     def credential(self):
+        """The use name/password used to connect to the remote server."""
         return self._credential
 
     @property
     def passive(self):
+        """Whether to access the server in passive mode."""
         return self._passive
 
-    def connection(self):
-        return super().connection()
+    def connect(self):
+        """Create a new connection and return it."""
+        return super().connect()
 
 
 # noinspection PyPep8Naming,PyAbstractClass
-class ftp_connection(files.fs_connection):
+class ftp_connection(fs_connection):
+    """
+    An ftp_connection manages the state for a new_instance to an FTP server, providing a standardized interface for
+    interacting with remote files and directories.
+    """
 
     def __init__(self, connector):
         """
         Create a new ftp_connection instance.
 
         Example:
-            # Get a connection to the FTP server.
-            connection = ftp_connection(connector)
+            # Get a new_instance to the FTP server.
+            new_instance = ftp_connection(connector)
         """
         assert isinstance(connector, FTPConnector)
         super().__init__(connector)
@@ -121,6 +182,7 @@ class ftp_connection(files.fs_connection):
 
     @property
     def is_open(self):
+        """Whether the FTP new_instance is currently open."""
         if self._is_open:
             try:
                 self._session.voidcmd('NOOP')
@@ -134,6 +196,7 @@ class ftp_connection(files.fs_connection):
         return super().is_open
 
     def open(self):
+        """Open the FTP new_instance."""
         assert not self.is_open
 
         user, password = self._connector.credential
@@ -144,7 +207,7 @@ class ftp_connection(files.fs_connection):
         self._session.login(user, password)
 
     def close(self):
-        """Close the FTP connection"""
+        """Close the FTP new_instance"""
         assert self.is_open
 
         # noinspection PyBroadException
@@ -158,6 +221,7 @@ class ftp_connection(files.fs_connection):
 
     @property
     def cwd(self):
+        """The current working directory of this FTP new_instance."""
         assert self.is_open
         return Path(self._session.pwd(), self)
 
@@ -210,7 +274,7 @@ class ftp_connection(files.fs_connection):
         path = self.check_path(path)
 
         # We can't work directly with an FTP file. Instead, we will create a temp file and return it as a proxy.
-        temp_path = files.local_fs_connection.get_temp_file_path(self.name(path))
+        temp_path = local.local_fs_connection.get_temp_file_path(self.name(path))
 
         # If we're not truncating the file, then we'll need to copy down the data.
         if mode not in ('w', 'wb'):
@@ -225,6 +289,13 @@ class ftp_connection(files.fs_connection):
                          proxy_path=temp_path, writeback=writeback)
 
     def list(self, path, pattern='*'):
+        """
+        Return a list of the names of the files and directories appearing in this folder.
+
+        :param path: The path to operate on.
+        :param pattern: A glob-style pattern against which names must match.
+        :return: A list of matching file and directory names.
+        """
         assert self.is_open
         path = Path(self.check_path(path), self)
         with path:
@@ -243,6 +314,12 @@ class ftp_connection(files.fs_connection):
             return [name for name in listing if pattern.match(name)]
 
     def size(self, path):
+        """
+        Get the size of the file.
+
+        :param path: The path to operate on.
+        :return: The size in bytes.
+        """
         assert self.is_open
         path = self.check_path(path)
 
@@ -251,6 +328,11 @@ class ftp_connection(files.fs_connection):
             return self._session.size(file_name)
 
     def remove(self, path):
+        """
+        Remove the folder or file.
+
+        :param path: The path to operate on.
+        """
         assert self.is_open
         path = self.check_path(path)
 
@@ -259,6 +341,13 @@ class ftp_connection(files.fs_connection):
             self._session.delete(file_name)
 
     def rename(self, path, new_name):
+        """
+        Rename a file object.
+
+        :param path: The path to be operated on.
+        :param new_name: The new name of the file object, as as string.
+        :return: None
+        """
         assert self.is_open
         path = self.check_path(path)
         assert new_name and isinstance(new_name, str)
@@ -269,6 +358,12 @@ class ftp_connection(files.fs_connection):
                 self._session.rename(file_name, new_name)
 
     def is_dir(self, path):
+        """
+        Determine if the path refers to an existing directory.
+
+        :param path: The path to operate on.
+        :return: Whether the path is a directory.
+        """
         assert self.is_open
         path = self.check_path(path)
 
@@ -280,6 +375,12 @@ class ftp_connection(files.fs_connection):
             return False
 
     def is_file(self, path):
+        """
+        Determine if the path refers to an existing file.
+
+        :param path: The path to operate on.
+        :return: Whether the path is a file.
+        """
         assert self.is_open
         path = self.check_path(path)
 

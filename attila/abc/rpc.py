@@ -1,6 +1,14 @@
+"""
+attila.abc.rpc
+==============
+
+Interface definition for remote procedure call server connections.
+"""
+
 from abc import ABCMeta, abstractmethod
 
 from . import connections
+
 
 __all__ = [
     "rpc_connection",
@@ -21,6 +29,7 @@ class rpc_connection(connections.connection, metaclass=ABCMeta):
         :param script: The script to execute.
         :return: The results, or None.
         """
+        self.verify_open()
 
     @abstractmethod
     def call(self, name, *args, **kwargs):
@@ -32,3 +41,4 @@ class rpc_connection(connections.connection, metaclass=ABCMeta):
         :param kwargs: Named arguments to be passed to the remote procedure.
         :return: The results, or None.
         """
+        self.verify_open()

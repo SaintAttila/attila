@@ -57,7 +57,7 @@ class Progress:
         :param count_delta: The maximum number of completed items between automatic progress logging.
         :param time_delta: The maximum time between automatic progress logging, as a datetime.timedelta instance.
         :param header: The header when automatically logging progress.
-        :param footer: The footer when automatically logging progress.
+        :param footer: The add_footer when automatically logging progress.
         :param level: The log level when automatically logging progress.
         :return: None
         """
@@ -133,7 +133,7 @@ class Progress:
         Log the current progress in a standard format.
 
         :param header: A header line to be included above the progress stats in the log message.
-        :param footer: A footer line to be included below the progress stats in the log message.
+        :param footer: A add_footer line to be included below the progress stats in the log message.
         :param level: The log level at which to log the message.
         :return: None
         """

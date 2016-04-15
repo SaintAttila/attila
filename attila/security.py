@@ -56,8 +56,10 @@ except ImportError:
 import cryptography.fernet
 
 
-from . import adodb
+from .db import adodb
 from . import env
+
+from .exceptions import ConfigurationError, EncryptionError, DecryptionError, PasswordRequiredError, BadPasswordError
 
 
 # Make sure our DLLs are available up front. Think of these as similar to
@@ -224,7 +226,7 @@ def _crypt_protect_data(data, key=None, description=None, flags=None):
     )
 
     if not success:
-        raise Exception("Encryption routine failed.")
+        raise EncryptionError("Encryption routine failed.")
 
     # noinspection PyTypeChecker
     return _from_blob(results)
@@ -257,7 +259,7 @@ def _crypt_unprotect_data(data, key=None, flags=None):
     )
 
     if not success:
-        raise Exception("Decryption routine failed.")
+        raise DecryptionError("Decryption routine failed.")
 
     # noinspection PyTypeChecker
     return _from_blob(results)
@@ -284,8 +286,8 @@ def get_password_database():
     """
     section = env.get_automation_config().get('Security', {}).get('Password Database')
     if section is None:
-        raise KeyError("The Password Database parameter is not set in the automation config.")
-    return adodb.ADODBConnector.load_from_config(env.get_automation_config(), section)
+        raise ConfigurationError("The Password Database parameter is not set in the automation config.")
+    return adodb.ADODBConnector.load_instance(env.get_automation_config(), section)
 
 
 def get_user_account_hash(account_name=None):
@@ -401,8 +403,9 @@ def _set_master_password(password):
 
     :param password: The new master password.
     """
-    if not isinstance(password, str):
-        raise TypeError(password)
+    assert isinstance(password, str)
+    if not password:
+        raise BadPasswordError("Invalid password.")
 
     encrypted_password = locally_encrypt(password)
     del password
@@ -651,7 +654,7 @@ def get_password(system, user_name, refresh_master=True):
             encrypted_password = base64.b64decode(row[0])
             break
         else:
-            raise KeyError("No valid password entry for this user name.")
+            raise PasswordRequiredError("No valid password entry for this user name.")
 
     # decrypt and remove salt & padding.
     # noinspection PyUnboundLocalVariable
@@ -846,7 +849,7 @@ def main():
     try:
         password = getpass.getpass('Enter new master automation password: ')
         if password != getpass.getpass('Re-enter new master automation password: '):
-            raise ValueError("Passwords do not match.")
+            raise BadPasswordError("Passwords do not match.")
         set_master_password(password)
     finally:
         del password

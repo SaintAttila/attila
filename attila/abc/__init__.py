@@ -2,19 +2,23 @@
 attila.abc
 ==========
 
-Abstract base classes for attila.
+Interface definitions for attila.
 """
 
-from . import configuration
+from . import configurations
 from . import connections
+from . import files
+from . import notifications
 from . import rpc
 from . import sql
 from . import transactions
 
 
 __all__ = [
-    "configuration",
+    "configurations",
     "connections",
+    "files",
+    "notifications",
     "rpc",
     "sql",
     "transactions",

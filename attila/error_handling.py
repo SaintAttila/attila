@@ -1,3 +1,5 @@
+# TODO: Revamp this, taking advantage of notifiers.
+
 import sys
 
 
