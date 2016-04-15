@@ -6,10 +6,12 @@ Automation framework.
 """
 
 from . import abc
+from . import configurations
+# from . import context
 from . import db
-from . import emails
 from . import env
 from . import error_handling
+from . import exceptions
 from . import fs
 from . import notifications
 from . import plugins
@@ -28,10 +30,12 @@ __version__ = '0.0.0'
 
 __all__ = [
     'abc',
+    'configurations',
+    'context',
     'db',
-    'emails',
     'env',
     'error_handling',
+    'exceptions',
     'fs',
     'notifications',
     'plugins',
