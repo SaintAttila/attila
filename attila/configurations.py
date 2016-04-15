@@ -7,6 +7,7 @@ Supports the automatic loading and configuration of compound objects directly fr
 
 import configparser
 import keyword
+import os
 
 from . import plugins
 
@@ -14,13 +15,21 @@ from .abc.configurations import (Configurable, ConfigurationError, InvalidConfig
                                  ConfigSectionNotFoundError, ConfigParameterNotFoundError,
                                  ObjectNotConfiguredError, ObjectNotReconfigurableError,
                                  NoConfigurableInstanceTypeError)
+from .abc.files import Path
 from .exceptions import verify_type
 
 
 __author__ = 'Aaron Hosford'
 
 __all__ = [
+    "load_global_value",
+    "load_global_function",
+    "get_default_config_search_dirs",
+    "iter_config_search_paths",
+    "load_config",
     "ConfigLoader",
+    "get_attila_config_loader",
+    "get_automation_config_loader",
     "Configurable",
     "ConfigurationError",
     "InvalidConfigurationError",
@@ -30,6 +39,17 @@ __all__ = [
     "ObjectNotReconfigurableError",
     "NoConfigurableInstanceTypeError",
 ]
+
+
+_CONFIG_EXTENSIONS = (
+    '.ini',
+    '.cfg',
+    '.conf',
+    '',
+)
+
+_ATTILA_CONFIG_LOADER = None
+_AUTOMATION_CONFIG_LOADER = None
 
 
 # TODO: Add load_global_value() and load_global_function() as entry points in the attila.config_loaders group.
@@ -73,13 +93,111 @@ def load_global_function(name):
     return function
 
 
+def get_default_config_search_dirs(file_name_base=None):
+    """
+    Return a list containing the default configuration file search directories for a given config file name
+    base. No checking is performed, so the directories returned may not exist.
+
+    :param file_name_base: The name of the configuration file, minus the extension.
+    :return: A list of directories in where the config file may be located, in order of descending
+        precedence.
+    """
+    if file_name_base is None or file_name_base.lower() == 'attila':
+        config_location = None
+    else:
+        # Careful with this recursion... We don't want an infinite loop.
+        attila_config_loader = get_attila_config_loader()
+        option_name = file_name_base.title() + ' Config'
+        config_location = attila_config_loader.load_option('DEFAULT', option_name, str, default=None)
+    if file_name_base is None:
+        environ_location = None
+    else:
+        environ_location = os.environ.get(file_name_base.upper() + '_CONFIG')
+    base_paths = [
+        '.',
+        config_location,
+        environ_location,
+        os.environ.get('ATTILA_CONFIG'),
+        '~',
+        '~/.automation',
+        '~/.config/attila',
+        '/etc/attila',
+        os.path.dirname(__file__),
+    ]
+    return [base_path for base_path in base_paths if base_path is not None]
+
+
+def iter_config_search_paths(file_name_base, dirs=None, extensions=None):
+    """
+    Iterate over the search paths for a configuration file. Only paths that actually exist are included.
+
+    :param file_name_base: The name of the config file, minus the extension.
+    :param dirs: The directories in which to search.
+    :param extensions: The file name extensions to check for.
+    :return: An iterator over the config files in order of descending precedence.
+    """
+    if dirs is None:
+        dirs = get_default_config_search_dirs(file_name_base)
+    if extensions is None:
+        extensions = _CONFIG_EXTENSIONS
+    covered = set()
+    for base_path in dirs:
+        base_path = os.path.expanduser(base_path)
+        base_path = os.path.expandvars(base_path)
+        base_path = os.path.abspath(base_path)
+        base_path = os.path.normcase(base_path)
+        base_path = os.path.normpath(base_path)
+        if not os.path.isdir(base_path):
+            continue
+        for extension in extensions:
+            full_path = os.path.join(base_path, file_name_base + extension)
+            if full_path not in covered:
+                covered.add(full_path)
+                if os.path.isfile(full_path):
+                    yield full_path
+
+
+def load_config(file_name_base, dirs=None, extensions=None, error=False):
+    """
+    Load one or more configuration files in order of precedence.
+
+    :param file_name_base: The name of the config file(s), minus the extension.
+    :param dirs: The directories in which to search.
+    :param extensions: The file name extensions to check for.
+    :param error: Whether to raise exceptions when the parser cannot read a config file.
+    :return: A configparser.ConfigParser instance containing the loaded parameters.
+    """
+    config = configparser.ConfigParser()
+    for path in reversed(iter_config_search_paths(file_name_base, dirs, extensions)):
+        # noinspection PyBroadException
+        try:
+            config.read(path)
+        except Exception:
+            if error:
+                raise
+    return config
+
+
 class ConfigLoader:
     """
     A ConfigLoader provides the ability to load compound objects from a configuration file.
     """
 
     def __init__(self, config, loaders=None):
-        assert isinstance(config, configparser.ConfigParser)
+        if isinstance(config, str):
+            if os.path.isfile(config):
+                path = config
+                config = configparser.ConfigParser()
+                config.read(path)
+            else:
+                config = load_config(file_name_base=config)
+        elif isinstance(config, Path):
+            path = config
+            config = configparser.ConfigParser()
+            with path.open() as file:
+                config.read_file(file)
+        verify_type(config, configparser.ConfigParser)
+
         self._config = config
         self._loaders = plugins.CONFIG_LOADERS if loaders is None else loaders
         self._loaded_instances = {}
@@ -243,3 +361,40 @@ class ConfigLoader:
             return self.load_section(section, loader, default)
         else:
             return self.load_option(section, option, loader, default)
+
+
+def get_attila_config_loader(error=False, refresh=False):
+    """
+    Get the configuration loader for the attila package. This is specifically configuring the
+    behavior of attila itself, not for controlling the automations implemented on top of it. If you are
+    looking for the global configuration settings shared among all automations, use
+    get_automation_config_loader() instead.
+
+    :param error: Whether to raise exceptions when the parser cannot read a config file.
+    :param refresh: Whether to reload the configuration information from disk.
+    :return: A ConfigLoader instance which can be used to load the attila-specific config settings.
+    """
+    global _ATTILA_CONFIG_LOADER
+    if refresh or _ATTILA_CONFIG_LOADER is None:
+        config = load_config('attila', error=error)
+        _ATTILA_CONFIG_LOADER = ConfigLoader(config)
+    assert isinstance(_ATTILA_CONFIG_LOADER, ConfigLoader)
+    return _ATTILA_CONFIG_LOADER
+
+
+def get_automation_config_loader(error=False, refresh=False):
+    """
+    Get the configuration loader for settings shared among all automations. This is distinct from the
+    attila config loader, which configures the behavior of attila itself.
+
+    :param error: Whether to raise exceptions when the parser cannot read a config file.
+    :param refresh: Whether to reload the configuration information from disk.
+    :return: A ConfigLoader instance which can be used to load the globally shared automation config
+        settings.
+    """
+    global _AUTOMATION_CONFIG_LOADER
+    if refresh or _AUTOMATION_CONFIG_LOADER is None:
+        config = load_config('automation', error=error)
+        _AUTOMATION_CONFIG_LOADER = ConfigLoader(config)
+    assert isinstance(_AUTOMATION_CONFIG_LOADER, ConfigLoader)
+    return _AUTOMATION_CONFIG_LOADER
