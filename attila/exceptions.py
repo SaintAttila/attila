@@ -130,11 +130,31 @@ class PropertyNotSetError(PropertyError):
     """The property has not been set."""
 
 
-def verify_type(obj, typ, *, non_empty=False):
+def verify_type(obj, typ, *, non_empty=False, allow_none=False):
     """
     Verify that the object has the given type. If not, raise an appropriate exception.
+
+    :param obj: The object to check.
+    :param typ: The expected type (or a tuple of types).
+    :param non_empty: If True, require the object to evaluate as True in a boolean context. (Default
+        False)
+    :param allow_none: If True, allow the object to be None. (Default False)
     """
+    if allow_none and obj is None:
+        return
     if not isinstance(obj, typ):
         raise TypeError(type(obj), typ)
     if non_empty and not obj:
         raise ValueError(obj)
+
+
+def verify_callable(obj, *, allow_none=False):
+    """
+    Verify that the object is callable. If not, raise an appropriate exception.
+    :param obj: The object to check.
+    :param allow_none: If True, allow the object to be None. (Default False)
+    """
+    if allow_none and obj is None:
+        return
+    if not callable(obj):
+        raise TypeError(callable, obj)
