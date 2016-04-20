@@ -7,10 +7,8 @@ Automation framework.
 
 from . import abc
 from . import configurations
-# from . import context
-from . import db
 from . import context
-from . import error_handling
+from . import db
 from . import exceptions
 from . import fs
 from . import notifications
@@ -33,8 +31,6 @@ __all__ = [
     'configurations',
     'context',
     'db',
-    'context.py',
-    'error_handling',
     'exceptions',
     'fs',
     'notifications',
