@@ -13,23 +13,31 @@ import logging
 log = logging.getLogger(__name__)
 
 
-class Progress:
+class progress:
     """
-    Automatically tracks and logs the progress towards completion of a measurable task of predetermined size.
+    Automatically tracks and logs the progress towards completion of a measurable task of
+    predetermined size.
 
     Example Usage:
-        with Progress(len(records),
-                      time_delta=datetime.timedelta(seconds=10),
-                      header="Processing records...") as progress:
-            for record in progress(records):
-                ...  # Process the record
+        for record in progress(records, time_delta=10, header="Processing records..."):
+            ...  # Process the record
 
     """
 
-    def __init__(self, total_count, completed_count=0, started=None, count_delta=None, time_delta=None, header=None,
-                 footer=None, level=None):
+    def __init__(self, iterable=None, total_count=None, completed_count=0, started=None,
+                 count_delta=None, time_delta=None, header=None, footer=None, level=None):
+        assert iterable is not None or total_count is not None
+
+        if total_count is None and iterable is not None:
+            total_count = len(iterable)
+
         if started is None:
             started = datetime.datetime.now()
+
+        if isinstance(time_delta, int):
+            time_delta = datetime.timedelta(seconds=time_delta)
+
+        self.iterable = iterable
         self.completed_count = completed_count
         self.total_count = total_count
         self.started = started
@@ -50,12 +58,15 @@ class Progress:
         """
         self.started = datetime.datetime.now()
 
-    def setup_automatic_logging(self, count_delta=None, time_delta=None, header=None, footer=None, level=None):
+    def setup_automatic_logging(self, count_delta=None, time_delta=None, header=None, footer=None,
+                                level=None):
         """
         Setup the automatic progress logging.
 
-        :param count_delta: The maximum number of completed items between automatic progress logging.
-        :param time_delta: The maximum time between automatic progress logging, as a datetime.timedelta instance.
+        :param count_delta: The maximum number of completed items between automatic progress
+            logging.
+        :param time_delta: The maximum time between automatic progress logging, as a
+            datetime.timedelta instance.
         :param header: The header when automatically logging progress.
         :param footer: The add_footer when automatically logging progress.
         :param level: The log level when automatically logging progress.
@@ -83,13 +94,14 @@ class Progress:
             (self.update_count_delta is not None and
              self.completed_count - self.last_update_count >= self.update_count_delta) or
             (self.update_time_delta is not None and
-             datetime.datetime.now() - (self.last_update_time or self.started) >= self.update_time_delta)
+             (datetime.datetime.now() - (self.last_update_time or self.started) >=
+              self.update_time_delta))
         )
 
     def update(self, completed_count=1):
         """
-        Update the number of completed items. If automatic logging is setup and a sufficient count or time period has
-        passed, log the progress.
+        Update the number of completed items. If automatic logging is setup and a sufficient count
+        or time period has passed, log the progress.
 
         :param completed_count:
         :return: None
@@ -173,9 +185,9 @@ class Progress:
     def __exit__(self, exc_type, exc_val, exc_tb):
         return False  # Do not suppress errors.
 
-    def __call__(self, iterable, count_delta=None, time_delta=None, header=None, footer=None, level=None):
-        self.setup_automatic_logging(count_delta, time_delta, header, footer, level)
-
-        for item in iterable:
+    def __iter__(self):
+        assert self.iterable is not None
+        self.setup_automatic_logging()
+        for item in self.iterable:
             yield item
             self.update()
