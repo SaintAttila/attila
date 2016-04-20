@@ -130,6 +130,18 @@ class PropertyNotSetError(PropertyError):
     """The property has not been set."""
 
 
+class ItemCountError(ValueError, AttilaException):
+    """Base class for item count-related errors."""
+
+
+class TooFewItemsError(ItemCountError):
+    """Too few items in a sequence to perform an operation."""
+
+
+class TooManyItemsError(ItemCountError):
+    """Too many items in a sequence to perform an operation."""
+
+
 def verify_type(obj, typ, *, non_empty=False, allow_none=False):
     """
     Verify that the object has the given type. If not, raise an appropriate exception.

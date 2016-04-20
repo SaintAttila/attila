@@ -2,27 +2,21 @@
 attila.utility
 ==============
 
-Utility functions. This module is the "miscellaneous bin", providing a home for simple functions and classes that don't
-really belong anywhere else.
+Utility functions. This module is the "miscellaneous bin", providing a home for simple functions and
+classes that don't really belong anywhere else.
 """
-
 
 import msvcrt
 import sys
 import time
 
-
-class TooFewItemsError(ValueError):
-    """Too few items in a sequence to perform an operation."""
-
-
-class TooManyItemsError(ValueError):
-    """Too many items in a sequence to perform an operation."""
+from .exceptions import TooFewItemsError, TooManyItemsError
 
 
 def first(items):
     """
-    Return the first item from a sequence. If the item sequence does not contain at least one value, raise an exception.
+    Return the first item from a sequence. If the item sequence does not contain at least one value,
+    raise an exception.
 
     :param items: The iterable sequence of items.
     :return: The first item in the sequence.
@@ -34,7 +28,8 @@ def first(items):
 
 def last(items):
     """
-    Return the lst item from a sequence. If the item sequence does not contain at least one value, raise an exception.
+    Return the lst item from a sequence. If the item sequence does not contain at least one value,
+    raise an exception.
 
     :param items: The iterable sequence of items.
     :return: The last item in the sequence.
@@ -51,9 +46,9 @@ def last(items):
 
 def only(items, ignore_duplicates=False):
     """
-    Return the only item from a sequence. If the item sequence does not contain exactly one value, raise an exception.
-    Among other scenarios, this is useful for verifying expected results in SQL queries when a single row is expected,
-    without bloating the code.
+    Return the only item from a sequence. If the item sequence does not contain exactly one value,
+    raise an exception. Among other scenarios, this is useful for verifying expected results in SQL
+    queries when a single row is expected, without bloating the code.
 
     :param items: The iterable sequence of items.
     :param ignore_duplicates: Whether to ignore multiple occurrences of the same value.
@@ -76,9 +71,9 @@ def only(items, ignore_duplicates=False):
 
 def distinct(items, key=None):
     """
-    Return a list of the items in the same order as they first appear, except that later duplicates of the same value
-    are removed. Items in the sequence must be hashable, or, if a key is provided, the return values of the key must be
-    hashable.
+    Return a list of the items in the same order as they first appear, except that later duplicates
+    of the same value are removed. Items in the sequence must be hashable, or, if a key is provided,
+    the return values of the key must be hashable.
 
     :param items: An iterable sequence of items.
     :param key: A function mapping the items to a comparison key.
@@ -101,8 +96,8 @@ def distinct(items, key=None):
     return results
 
 
-def wait_for(condition, timeout=None, attempts=None, interval=None, raise_error=False, ignore_errors=True,
-             args=None, kwargs=None):
+def wait_for(condition, timeout=None, attempts=None, interval=None, raise_error=False,
+             ignore_errors=True, args=None, kwargs=None):
     """
     Wait for the specified condition to be satisfied.
 
@@ -111,7 +106,8 @@ def wait_for(condition, timeout=None, attempts=None, interval=None, raise_error=
     :param attempts: The maximum number of attempts to make before giving up.
     :param interval: The number of seconds to wait between attempts. Default is 1.
     :param raise_error: Whether to raise a TimeoutError on failure, or just return False.
-    :param ignore_errors: Whether to treat errors in the condition as the condition not being met, or re-raise them.
+    :param ignore_errors: Whether to treat errors in the condition as the condition not being met,
+        or re-raise them.
     :param args: The argument list to pass to the condition.
     :param kwargs: The keyword arguments to pass to the condition.
     """
@@ -162,15 +158,17 @@ def wait_for(condition, timeout=None, attempts=None, interval=None, raise_error=
 def retry(function, timeout=None, attempts=None, interval=None, handler=None,
           args=None, kwargs=None):
     """
-    Repeatedly try to call the function until it returns without error. If the function returns without error, pass the
-    return value through to the caller. Otherwise, if the maximum time or number of attempts is exceeded, pass the most
-    recent exception through to the caller. The function is guaranteed to be called at least once.
+    Repeatedly try to call the function until it returns without error. If the function returns
+    without error, pass the return value through to the caller. Otherwise, if the maximum time or
+    number of attempts is exceeded, pass the most recent exception through to the caller. The
+    function is guaranteed to be called at least once.
 
     :param function: A callable (function, method, or lambda) which is called repeatedly.
     :param timeout: The maximum number of seconds to wait before giving up.
     :param attempts: The maximum number of attempts to make before giving up.
     :param interval: The number of seconds to wait between attempts. Default is 1.
-    :param handler: A function that is called after each failed attempt, passing it the sys.exc_info() of the exception.
+    :param handler: A function that is called after each failed attempt, passing it the
+        sys.exc_info() of the exception.
     :param args: The argument list to pass to the function.
     :param kwargs: The keyword arguments to pass to the function.
     """
@@ -202,7 +200,8 @@ def retry(function, timeout=None, attempts=None, interval=None, handler=None,
         except Exception:
             if handler is not None:
                 handler(*sys.exc_info())
-            if (end_time is not None and time.time() >= end_time) or (attempts is not None and counter >= attempts):
+            if ((end_time is not None and time.time() >= end_time) or
+                    (attempts is not None and counter >= attempts)):
                 raise
 
         time.sleep(interval)  # Avoid eating unnecessary resources.
@@ -219,8 +218,9 @@ def wait_for_keypress():
 # noinspection PyPep8Naming
 class once:  # Lower-case naming is standard for decorators.
     """
-    Function decorator to make a function callable exactly once. Once a function has successfully returned without an
-    exception, subsequent calls just return the same return value as the first call.
+    Function decorator to make a function callable exactly once. Once a function has successfully
+    returned without an exception, subsequent calls just return the same return value as the first
+    call.
 
     :param function: The function to be wrapped.
     :return: The wrapped function.
