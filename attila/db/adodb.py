@@ -27,9 +27,9 @@ __all__ = [
 
 class Constants:
     """
-    Microsoft-defined constants for use with ADODB. These have the original names (as ugly as they are) preserved for
-    Googling convenience. They are not meant to be exported as part of this module's public interface and should only
-    be used here within this module.
+    Microsoft-defined constants for use with ADODB. These have the original names (as ugly as they
+    are) preserved for Googling convenience. They are not meant to be exported as part of this
+    module's public interface and should only be used here within this module.
     """
 
     # Cursor locations
@@ -55,7 +55,8 @@ class Constants:
 
 class ADODBRecordSet(sql.RecordSet):
     """
-    An ADODBRecordSet is returned whenever a query is executed. It provides an interface to the selected data.
+    An ADODBRecordSet is returned whenever a query is executed. It provides an interface to the
+    selected data.
     """
 
     def __init__(self, com_object):
@@ -65,7 +66,8 @@ class ADODBRecordSet(sql.RecordSet):
         if self._com_object.EOF or self._com_object.BOF:
             raise StopIteration()
 
-        # We should never expose the raw COM object at all. Grab the values out and put them in a tuple instead.
+        # We should never expose the raw COM object at all. Grab the values out and put them in a
+        # tuple instead.
         result = tuple(field.Value for field in self._com_object.Fields)
 
         self._com_object.MoveNext()
@@ -74,8 +76,9 @@ class ADODBRecordSet(sql.RecordSet):
 
 class ADODBConnector(connections.Connector, configurations.Configurable):
     """
-    Stores the ADODB new_instance information for a database as a single object which can then be passed around instead
-    of using multiple parameters to a function. Use str(connector) to get the actual new_instance string.
+    Stores the ADODB new_instance information for a database as a single object which can then be
+    passed around instead of using multiple parameters to a function. Use str(connector) to get the
+    actual new_instance string.
     """
 
     @staticmethod
@@ -269,12 +272,14 @@ class ADODBConnector(connections.Connector, configurations.Configurable):
         """Whether the new_instance is "trusted"."""
         return self._trusted
 
-    def connect(self, command_timeout=None, connection_timeout=None, auto_reconnect=True, cursor_location=None):
+    def connect(self, command_timeout=None, connection_timeout=None, auto_reconnect=True,
+                cursor_location=None):
         """
         Create a new new_instance and return it. The new_instance is not automatically opened.
 
         :param command_timeout: The number of seconds to wait for a command to execute.
-        :param connection_timeout: The number of seconds to wait for a new_instance attempt to succeed.
+        :param connection_timeout: The number of seconds to wait for a new_instance attempt to
+            succeed.
         :param auto_reconnect: Whether to automatically reconnect if the new_instance is broken.
         :param cursor_location: The initial cursor location.
         :return: The new, unopened new_instance.
@@ -287,7 +292,8 @@ class ADODBConnector(connections.Connector, configurations.Configurable):
         )
 
     def __str__(self):
-        result = "Driver={%s};Server={%s};Database={%s}" % (self._driver, self._server, self._database)
+        result = \
+            "Driver={%s};Server={%s};Database={%s}" % (self._driver, self._server, self._database)
         if self._credential:
             user, password = self._credential
             result += ";Uid={%s};Pwd={%s}" % (user, password)
@@ -298,7 +304,9 @@ class ADODBConnector(connections.Connector, configurations.Configurable):
     def __repr__(self):
         keyword = False
         args = [repr(self._server), repr(self._database)]
-        for name, value in (('driver', self._driver), ('credential', self._credential), ('trusted', self._trusted)):
+        for name, value in (('driver', self._driver),
+                            ('credential', self._credential),
+                            ('trusted', self._trusted)):
             if value is None or (name == 'driver' and value.lower() == 'sql server'):
                 keyword = True
                 continue
@@ -312,12 +320,12 @@ class ADODBConnector(connections.Connector, configurations.Configurable):
 # noinspection PyPep8Naming
 class adodb_connection(sql.sql_connection, transactions.transactional_connection):
     """
-    An adodb_connection manages the state for a new_instance to a SQL server via ADODB, providing an interface for
-    executing queries and commands.
+    An adodb_connection manages the state for a new_instance to a SQL server via ADODB, providing an
+    interface for executing queries and commands.
     """
 
-    def __init__(self, connector, command_timeout=None, connection_timeout=None, auto_reconnect=True,
-                 cursor_location=None):
+    def __init__(self, connector, command_timeout=None, connection_timeout=None,
+                 auto_reconnect=True, cursor_location=None):
         """
         Create a new adodb_connection instance.
 
@@ -358,7 +366,8 @@ class adodb_connection(sql.sql_connection, transactions.transactional_connection
         """Open the ADODB new_instance."""
         super().open()
 
-        # The state may have other bits set, but we only care about the one that indicates whether it's open or not.
+        # The state may have other bits set, but we only care about the one that indicates whether
+        # it's open or not.
         if self._com_object is not None and (self._com_object.State & Constants.adStateOpen):
             return  # If it's open already, do nothing.
 
@@ -412,8 +421,8 @@ class adodb_connection(sql.sql_connection, transactions.transactional_connection
 
     def _execute(self, command):
         """
-        Execute a SQL command or query. If a result table is generated, it is returned as an iterator over the records.
-        Otherwise None is returned.
+        Execute a SQL command or query. If a result table is generated, it is returned as an
+        iterator over the records. Otherwise None is returned.
 
         :param command: The SQL command to execute.
         :return: A ADODBRecordSet instance (for queries) or None.
@@ -426,8 +435,9 @@ class adodb_connection(sql.sql_connection, transactions.transactional_connection
 
     def _call(self, name, *parameters):
         """
-        Execute a stored procedure. The stored procedure can dump return data to a results table to be queried later on
-        or converted to read depending on how the stored procedure handles its data.
+        Execute a stored procedure. The stored procedure can dump return data to a results table to
+        be queried later on or converted to read depending on how the stored procedure handles its
+        data.
 
         Example:
             # Execute a stored procedure with 2 parameters from an open new_instance.

@@ -5,6 +5,7 @@ attila.db.sqlite
 SQLite database interface for Python
 """
 
+
 import sqlite3
 
 
@@ -27,7 +28,8 @@ __all__ = [
 
 class SQLiteRecordSet(sql.RecordSet):
     """
-    An SQLiteRecordSet is returned whenever a query is executed. It provides an interface to the selected data.
+    An SQLiteRecordSet is returned whenever a query is executed. It provides an interface to the
+    selected data.
     """
 
     def __init__(self, cursor):
@@ -42,8 +44,9 @@ class SQLiteRecordSet(sql.RecordSet):
 
 class SQLiteConnector(connections.Connector, configurations.Configurable):
     """
-    Stores the SQLite new_instance information for a database as a single object which can then be passed around instead
-    of using multiple parameters to a function. Use str(connector) to get the actual new_instance string.
+    Stores the SQLite new_instance information for a database as a single object which can then be
+    passed around instead of using multiple parameters to a function. Use str(connector) to get the
+    actual new_instance string.
     """
 
     @classmethod
@@ -140,8 +143,8 @@ class SQLiteConnector(connections.Connector, configurations.Configurable):
 # noinspection PyPep8Naming
 class sqlite_connection(sql.sql_connection, transactions.transactional_connection):
     """
-    A sqlite_connection manages the state for a new_instance to a SQLite database, providing an interface for
-    executing queries and commands.
+    A sqlite_connection manages the state for a new_instance to a SQLite database, providing an
+    interface for executing queries and commands.
     """
 
     def __init__(self, connector):
@@ -195,8 +198,8 @@ class sqlite_connection(sql.sql_connection, transactions.transactional_connectio
 
     def _execute(self, command):
         """
-        Execute a SQL command or query. If a result table is generated, it is returned as an iterator over the records.
-        Otherwise None is returned.
+        Execute a SQL command or query. If a result table is generated, it is returned as an
+        iterator over the records. Otherwise None is returned.
 
         :param command: The SQL command to execute.
         :return: A SQLiteRecordSet instance (for queries) or None.
@@ -207,8 +210,9 @@ class sqlite_connection(sql.sql_connection, transactions.transactional_connectio
 
     def _call(self, name, *parameters):
         """
-        Execute a stored procedure. The stored procedure can dump return data to a results table to be queried later on
-        or converted to read depending on how the stored procedure handles its data.
+        Execute a stored procedure. The stored procedure can dump return data to a results table to
+        be queried later on or converted to read depending on how the stored procedure handles its
+        data.
 
         Example:
             # Execute a stored procedure with 2 parameters from an open new_instance.
