@@ -13,8 +13,8 @@ import win32api
 import win32com.client
 import win32con
 
-
-from .utility import only, TooFewItemsError
+from .utility import only
+from .exceptions import TooFewItemsError, verify_type, verify_callable
 
 
 __all__ = [
@@ -28,6 +28,11 @@ __all__ = [
     "kill_process_family",
     "capture_process"
 ]
+
+
+# Exit code can be any integer. I picked the binary representation of the
+# string "TERM" as the default used when a process is forced to terminate.
+DEFAULT_TERMINATION_EXIT_CODE = 1413829197
 
 
 def process_exists(pid=None, name=None):
@@ -44,8 +49,8 @@ def process_exists(pid=None, name=None):
 
 def count_processes(pid=None, name=None):
     """
-    Count the number of active processes. If a process ID or process name is provided, count only processes that match
-    the requirements.
+    Count the number of active processes. If a process ID or process name is provided, count only
+    processes that match the requirements.
 
     :param pid: The process ID of the process.
     :param name: The name of the process.
@@ -82,9 +87,11 @@ def get_name(pid, default=None):
     :return: The name of the process.
     """
     try:
-        return only(process.Properties_("Name").Value
-                    for process in win32com.client.GetObject('winmgmts:').InstancesOf('Win32_Process')
-                    if process.Properties_("ProcessID").Value == pid)
+        return only(
+            process.Properties_("Name").Value
+            for process in win32com.client.GetObject('winmgmts:').InstancesOf('Win32_Process')
+            if process.Properties_("ProcessID").Value == pid
+        )
     except TooFewItemsError:
         return default
 
@@ -98,11 +105,13 @@ def get_parent_pid(pid):
     """
 
     wmi = win32com.client.GetObject('winmgmts:')
-    parent_pids = wmi.ExecQuery('SELECT ParentProcessID FROM Win32_Process WHERE ProcessID=%s' % pid)
-    assert len(parent_pids) <= 1
+    # noinspection SqlDialectInspection,SqlNoDataSourceInspection
+    parent_pids = wmi.ExecQuery(
+        'SELECT ParentProcessID FROM Win32_Process WHERE ProcessID=%s' % pid
+    )
     if not parent_pids:
         return None
-    return parent_pids[0].Properties_('ParentProcessID').Value
+    return only(parent_pids).Properties_('ParentProcessID').Value
 
 
 def get_child_pids(pid):
@@ -114,6 +123,7 @@ def get_child_pids(pid):
     """
 
     wmi = win32com.client.GetObject('winmgmts:')
+    # noinspection SqlNoDataSourceInspection,SqlDialectInspection
     children = wmi.ExecQuery('SELECT * FROM Win32_Process WHERE ParentProcessID = %s' % pid)
     return [child.Properties_('ProcessId').Value for child in children]
 
@@ -123,14 +133,13 @@ def kill_process(pid, exit_code=None):
     Kill a specific process.
 
     :param pid: The process ID of the process to be terminated.
-    :param exit_code: The exit code that the terminated process should return. (Default is 1413829197.)
+    :param exit_code: The exit code that the terminated process should return. (Default is
+        DEFAULT_TERMINATION_EXIT_CODE.)
     :return: Whether the process was successfully terminated.
     """
 
-    # Exit code can be any integer. I picked the binary representation of the
-    # string "TERM" as the default.
     if exit_code is None:
-        exit_code = 1413829197
+        exit_code = DEFAULT_TERMINATION_EXIT_CODE
 
     try:
         handle = win32api.OpenProcess(win32con.PROCESS_TERMINATE, 0, pid)
@@ -176,21 +185,22 @@ def kill_process_family(pid, exit_code=None, timeout=None):
 
 def capture_process(command, process_name=None, closer=None, args=None, kwargs=None):
     """
-    Call the command and capture its return value. Watch for a unique process to be created by the command, and capture
-    its PID. If a unique new process could not be identified, raise an exception. If anything goes wrong after the
-    command is called, and a closer has been provided, pass the return value from the command to the closer before
-    raising the exception.
+    Call the command and capture its return value. Watch for a unique process to be created by the
+    command, and capture its PID. If a unique new process could not be identified, raise an
+    exception. If anything goes wrong after the command is called, and a closer has been provided,
+    pass the return value from the command to the closer before raising the exception.
 
     :param command: A Python callable (a function, method, lambda, or class initializer).
     :param process_name: The expected name of the process that will be created by the command.
     :param closer: A Python callable that releases resources if an exception occurs.
     :param args: Arguments to be passed to the command.
     :param kwargs: Keyword arguments to be passed to the command.
-    :return: A pair, (result, pid), where result is the return value of the command and pid is the new process ID.
+    :return: A pair, (result, pid), where result is the return value of the command and pid is the
+        new process ID.
     """
-    assert callable(command)
-    assert process_name is None or isinstance(process_name, str)
-    assert closer is None or callable(closer)
+    verify_callable(command)
+    verify_type(process_name, str, non_empty=True, allow_none=True)
+    verify_callable(closer, allow_none=True)
 
     if args is None:
         args = ()
