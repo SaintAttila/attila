@@ -54,9 +54,11 @@ except ImportError:
 #   pip install cryptography
 import cryptography.fernet
 
-from . import configurations
-from .abc.connections import Connector
-from .exceptions import EncryptionError, DecryptionError, PasswordRequiredError, BadPasswordError
+from attila.abc.connections import Connector
+from attila.abc.files import Path
+
+from attila import configurations
+from attila.exceptions import EncryptionError, DecryptionError, PasswordRequiredError, BadPasswordError
 
 
 # Make sure our DLLs are available up front. Think of these as similar to
@@ -82,11 +84,12 @@ SALT_SIZE = 1024
 
 class Credential(collections.namedtuple('Credential', 'user password')):
     """
-    A Credential is a user/password pair. It's handy for passing around to reduce the number of required 
-    parameters in function calls.
+    A Credential is a user/password pair. It's handy for passing around to reduce the number of
+    required parameters in function calls.
     """
 
-    # These are here so PyCharm will notice the properties exist. It doesn't handle named tuples perfectly.
+    # These are here so PyCharm will notice the properties exist. It doesn't handle named tuples
+    # perfectly.
     user = None
     password = None
 
@@ -108,9 +111,9 @@ class Credential(collections.namedtuple('Credential', 'user password')):
         password_path = config_section.get('Password Path')
         password_system_name = config_section.get('Password System Name')
 
-        # There are two options for getting a password: Load it from the password database, or from a 
-        # locally-encrypted password file. If it's from the database, we need a system name. If it's 
-        # from a file, we need a file path.
+        # There are two options for getting a password: Load it from the password database, or from
+        # a locally-encrypted password file. If it's from the database, we need a system name. If
+        # it's from a file, we need a file path.
         password = None
         if password_path or password_system_name:
             if password_path and os.path.isfile(password_path):
@@ -137,29 +140,30 @@ class Credential(collections.namedtuple('Credential', 'user password')):
         return self.user is not None and self.password is not None
 
     def __str__(self):
-        # We hide the password on purpose, to prevent accidentally displaying it. If you really want it, 
-        # construct the string yourself.
+        # We hide the password on purpose, to prevent accidentally displaying it. If you really want
+        # it, construct the string yourself.
         return 'password for user ' + str(self.user)
 
     def __repr__(self):
-        # We hide the password on purpose, to prevent accidentally displaying it. If you really want it, 
-        # construct the string yourself.
+        # We hide the password on purpose, to prevent accidentally displaying it. If you really want
+        # it, construct the string yourself.
         return type(self).__name__ + "(" + repr(self.user) + ", '********')"
 
 
 # noinspection PyPep8Naming
 class DATA_BLOB(ctypes.Structure):
     """
-    This class is a wrapper for a C struct by the same name, from WINCRYPT.H. It is used to transfer byte 
-    sequences to/from the windows crypt32 DLL.
+    This class is a wrapper for a C struct by the same name, from WINCRYPT.H. It is used to transfer
+    byte sequences to/from the windows crypt32 DLL.
 
-    The reason for using this class, together with the functions _to_blob, _from_blob, _crypt_protect_data, 
-    and _crypt_unprotect_data, rather than simply using win32crypt from the pywin32 package, is that pywin32 
-    won't install on one of our servers, so anything dependent on it fails.
+    The reason for using this class, together with the functions _to_blob, _from_blob,
+    _crypt_protect_data, and _crypt_unprotect_data, rather than simply using win32crypt from the
+    pywin32 package, is that pywin32 won't install on one of our servers, so anything dependent on
+    it fails.
     """
 
-    # cbData = length of pbData
-    # pbData = c_buffer of length cbData, containing the actual data
+    # cbData is the length of pbData
+    # pbData is a c_buffer of length cbData, containing the actual data
     _fields_ = [
         ("cbData", ctypes.wintypes.DWORD),
         ("pbData", ctypes.POINTER(ctypes.c_char))
@@ -196,14 +200,15 @@ def _from_blob(blob):
 
 def _crypt_protect_data(data, key=None, description=None, flags=None):
     """
-    Wraps a call to the windows crypt32 DLL's CryptProtectData function. This function encrypts data with 
-    an optional password. If the default flags are used, it does so in such a way that it can only be 
-    decrypted on the same machine by the same user.
+    Wraps a call to the windows crypt32 DLL's CryptProtectData function. This function encrypts data
+    with an optional password. If the default flags are used, it does so in such a way that it can
+    only be decrypted on the same machine by the same user.
 
     :param data: The data to be encrypted.
     :param key: An optional additional encryption key.
     :param description: An optional description of the encrypted data.
-    :param flags: The encryption flags. Defaults to CRYPTPROTECT_LOCAL_MACHINE | CRYPTPROTECT_UI_FORBIDDEN.
+    :param flags: The encryption flags. Defaults to CRYPTPROTECT_LOCAL_MACHINE |
+        CRYPTPROTECT_UI_FORBIDDEN.
     :return: The encrypted data.
     """
 
@@ -231,8 +236,8 @@ def _crypt_protect_data(data, key=None, description=None, flags=None):
 
 def _crypt_unprotect_data(data, key=None, flags=None):
     """
-    Wraps a call to the windows crypt32 DLL's CryptUnprotectData function. This function decrypts data 
-    previously encrypted by CryptProtectData.
+    Wraps a call to the windows crypt32 DLL's CryptUnprotectData function. This function decrypts
+    data previously encrypted by CryptProtectData.
 
     :param data: The data to be decrypted.
     :param key: The optional encryption key used to encrypt the data.
@@ -268,10 +273,14 @@ def get_master_password_path():
 
     :return: The master password file path.
     """
-    return (
-        configurations.get_automation_config_loader().get('Security', {}).get('Password Data Path') or
-        configurations.get_attila_config_loader()['Security']['Password Data Path']
-    )
+
+    auto_config = configurations.get_automation_config_loader()
+    result = auto_config.load_option('Security', 'Password Data Path', Path, default=None)
+    if result is not None:
+        return result
+
+    attila_config = configurations.get_attila_config_loader()
+    return attila_config.load_option('Security', 'Password Data Path', Path)
 
 
 def get_password_database_connector():
@@ -303,9 +312,9 @@ def get_user_account_hash(account_name=None):
 
 def to_bytes(data):
     """
-    Ensure that a character sequence is represented as a bytes object. If it's already a bytes object, no 
-    change is made. If it's a string object, it's encoded as a UTF-8 string. Otherwise, it is treated as 
-    a sequence of character ordinal values.
+    Ensure that a character sequence is represented as a bytes object. If it's already a bytes
+    object, no change is made. If it's a string object, it's encoded as a UTF-8 string. Otherwise,
+    it is treated as a sequence of character ordinal values.
 
     :param data: The data to be converted to bytes.
     :return: The data, converted to a bytes instance.
@@ -319,9 +328,9 @@ def to_bytes(data):
 
 def from_bytes(data):
     """
-    Ensure that a character sequence is represented as a string object. If it's already a string object, 
-    no change is made. If it's a data object, it's decoded as a UTF-8 string. Otherwise, it is treated 
-    as a sequence of character ordinal values and decoded as a UTF-8 string.
+    Ensure that a character sequence is represented as a string object. If it's already a string
+    object, no change is made. If it's a data object, it's decoded as a UTF-8 string. Otherwise, it
+    is treated as a sequence of character ordinal values and decoded as a UTF-8 string.
 
     :param data: The data to be converted.
     :return: The data, converted to a str instance.
@@ -335,8 +344,8 @@ def from_bytes(data):
 
 def locally_encrypt(data, key=None, description=None):
     """
-    Calls the underlying OS system call function that performs encryption. Only the same user can decrypt 
-    the data encrypted by this function.
+    Calls the underlying OS system call function that performs encryption. Only the same user can
+    decrypt the data encrypted by this function.
 
     :param data: The data to be encrypted.
     :param key: An optional additional encryption key.
@@ -368,8 +377,8 @@ def locally_encrypt(data, key=None, description=None):
 
 def locally_decrypt(data, key=None):
     """
-    Calls the underlying OS system call function that performs decryption. This function can only decrypt 
-    data encrypted by the same user using the locally_encrypt() function.
+    Calls the underlying OS system call function that performs decryption. This function can only
+    decrypt data encrypted by the same user using the locally_encrypt() function.
 
     :param data: The data to be decrypted.
     :param key: The optional additional key used to encrypt the data.
@@ -393,10 +402,10 @@ def locally_decrypt(data, key=None):
 
 def _set_master_password(password):
     """
-    Encrypt and save the master automation password. (Note that this is distinct from the password for 
-    the Windows automation login.) The password must be a unicode string. IMPORTANT: Do not use this 
-    function directly; use set_master_password() instead. Otherwise the passwords encrypted in the 
-    database will not be accessible with the new master password.
+    Encrypt and save the master automation password. (Note that this is distinct from the password
+    for the Windows automation login.) The password must be a unicode string. IMPORTANT: Do not use
+    this function directly; use set_master_password() instead. Otherwise the passwords encrypted in
+    the database will not be accessible with the new master password.
 
     :param password: The new master password.
     """
@@ -407,14 +416,14 @@ def _set_master_password(password):
     encrypted_password = locally_encrypt(password)
     del password
 
-    with open(get_master_password_path(), 'wb') as file_obj:
-        file_obj.write(encrypted_password)
+    with get_master_password_path().open(mode='wb') as password_file:
+        password_file.write(encrypted_password)
 
 
 def set_master_password(password):
     """
-    Sets the master password. Re-encrypts each system password in the database that was encrypted with 
-    the old master password so that it is accessible with the new master password.
+    Sets the master password. Re-encrypts each system password in the database that was encrypted
+    with the old master password so that it is accessible with the new master password.
 
     :param password: The new master password.
     """
@@ -468,16 +477,16 @@ def set_master_password(password):
 
 def get_master_password(refresh=True):
     """
-    Read and decrypt the master automation password. (Note that this is distinct from the password for 
-    the Windows automation login.) The password is returned as a unicode string. if refresh is set, 
-    first checks for a possible password update stored in the database.
+    Read and decrypt the master automation password. (Note that this is distinct from the password
+    for the Windows automation login.) The password is returned as a unicode string. if refresh is
+    set, first checks for a possible password update stored in the database.
 
     :param refresh: Whether to check the password database to see if the local cache is out of date.
     :return: The master password.
     """
 
-    with open(get_master_password_path(), 'rb') as oFile:
-        encrypted_password = oFile.read()
+    with get_master_password_path().open(mode='rb') as password_file:
+        encrypted_password = password_file.read()
 
     password = from_bytes(locally_decrypt(encrypted_password))
 
@@ -506,9 +515,9 @@ def get_encryption_key(password):
 
 def encrypt(data, password=None):
     """
-    Accept a string of unencrypted data and return it as an encrypted byte sequence (a bytes instance). 
-    If no password is provided, the master password is used by default. Note that this function returns 
-    a bytes instance, not a unicode string.
+    Accept a string of unencrypted data and return it as an encrypted byte sequence (a bytes
+    instance). If no password is provided, the master password is used by default. Note that this
+    function returns a bytes instance, not a unicode string.
 
     :param data: The data to be encrypted.
     :param password: The password to use for encryption. Defaults to the master password.
@@ -524,10 +533,11 @@ def encrypt(data, password=None):
 
 def decrypt(data, password=None):
     """
-    Accept an encrypted byte sequence (a bytes instance) and return it as an unencrypted byte sequence. 
-    Note that the return value is a bytes instance, not a string; if you passed in a unicode string and 
-    want that back, you will have to decode it using from_bytes(). This is because this function makes 
-    no assumption that what you originally passed in was a UTF-8 string as opposed to a raw byte sequence.
+    Accept an encrypted byte sequence (a bytes instance) and return it as an unencrypted byte
+    sequence. Note that the return value is a bytes instance, not a string; if you passed in a
+    unicode string and want that back, you will have to decode it using from_bytes(). This is
+    because this function makes no assumption that what you originally passed in was a UTF-8 string
+    as opposed to a raw byte sequence.
 
     :param data: The data to be decrypted.
     :param password: The password to use for decryption. Defaults to the master password.
@@ -553,18 +563,17 @@ def get_systems():
 
     # Query the DB for the username.
     with get_password_database_connector().connect() as connection:
-        results = connection.Execute(
-            "SELECT DISTINCT System FROM AutomationPasswords"
-        )
+        # noinspection SqlDialectInspection,SqlNoDataSourceInspection
+        results = connection.Execute("SELECT DISTINCT System FROM AutomationPasswords")
         return {row[0] for row in results}
 
 
 def get_user_names(system_name, valid=True):
     """
-    Get a set containing the user names for which a password has been stored for the given system. By 
-    default, only user names with valid passwords are returned. If valid is set to False, only user names 
-    with invalid passwords are returned. (This second option can be used for reporting purposes, to 
-    identify user names that need fresh passwords and notify the appropriate users.)
+    Get a set containing the user names for which a password has been stored for the given system.
+    By default, only user names with valid passwords are returned. If valid is set to False, only
+    user names with invalid passwords are returned. (This second option can be used for reporting
+    purposes, to identify user names that need fresh passwords and notify the appropriate users.)
 
     :param system_name: The name of the system for which user names are requested.
     :param valid: Whether to only include user names with valid passwords.
@@ -573,6 +582,7 @@ def get_user_names(system_name, valid=True):
 
     # Query the DB for the username.
     with get_password_database_connector().connect() as connection:
+        # noinspection SqlDialectInspection,SqlNoDataSourceInspection
         results = connection.Execute(
             "SELECT UserName FROM AutomationPasswords WHERE System = '" +
             system_name + "' AND Valid = " + str(int(valid))
@@ -582,8 +592,9 @@ def get_user_names(system_name, valid=True):
 
 def set_password(system_name, user_name, password, valid=True, refresh_master=True):
     """
-    Set the password for the given user name. If it already exists, overwrites it. If it doesn't exist, 
-    adds it. Automatically sets or clears the valid password flag based on the value passed in for valid.
+    Set the password for the given user name. If it already exists, overwrites it. If it doesn't
+    exist, adds it. Automatically sets or clears the valid password flag based on the value passed
+    in for valid.
 
     :param system_name: The name of the system.
     :param user_name: The user name on the system.
@@ -610,6 +621,7 @@ def set_password(system_name, user_name, password, valid=True, refresh_master=Tr
 
     # Write the username/password to the DB.
     with get_password_database_connector().connect() as connection:
+        # noinspection SqlDialectInspection,SqlNoDataSourceInspection
         results = list(
             connection.Execute(
                 "SELECT Password FROM AutomationPasswords WHERE System = '" +
@@ -618,6 +630,7 @@ def set_password(system_name, user_name, password, valid=True, refresh_master=Tr
         )
 
         if results:
+            # noinspection SqlDialectInspection,SqlNoDataSourceInspection
             connection.Execute(
                 "UPDATE AutomationPasswords SET Password = '" +
                 encrypted_password + "', Valid = " + str(int(valid)) +
@@ -625,6 +638,7 @@ def set_password(system_name, user_name, password, valid=True, refresh_master=Tr
                 user_name + "'"
             )
         else:
+            # noinspection SqlDialectInspection,SqlNoDataSourceInspection
             connection.Execute(
                 "INSERT INTO AutomationPasswords VALUES('" + system_name + "', '" +
                 user_name + "', '" + encrypted_password + "', " +
@@ -645,6 +659,7 @@ def get_password(system, user_name, refresh_master=True):
 
     # Query the DB for the username's password.
     with get_password_database_connector().connect() as connection:
+        # noinspection SqlDialectInspection,SqlNoDataSourceInspection
         results = connection.Execute(
             "SELECT Password FROM AutomationPasswords WHERE System = '" +
             system + "' AND UserName = '" + user_name + "' AND Valid = 1"
@@ -667,8 +682,8 @@ def get_password(system, user_name, refresh_master=True):
 
 def invalidate_password(system_name, user_name):
     """
-    Mark the password for the given username as invalid. This should be called whenever a login attempt 
-    fails and repeated attempts with a bad password could result in account lockout.
+    Mark the password for the given username as invalid. This should be called whenever a login
+    attempt fails and repeated attempts with a bad password could result in account lockout.
 
     :param system_name: The name of the system.
     :param user_name: The user name on the system.
@@ -676,6 +691,7 @@ def invalidate_password(system_name, user_name):
 
     # Set the valid password flag to false in the DB.
     with get_password_database_connector().connect() as connection:
+        # noinspection SqlDialectInspection,SqlNoDataSourceInspection
         connection.Execute(
             "UPDATE AutomationPasswords SET Valid = 0 WHERE System = '" +
             system_name + "' AND UserName = '" + user_name + "'"
@@ -692,6 +708,7 @@ def remove_user_name(system_name, user_name):
 
     # Delete the username/password from the DB.
     with get_password_database_connector().connect() as connection:
+        # noinspection SqlDialectInspection,SqlNoDataSourceInspection
         connection.Execute(
             "DELETE FROM AutomationPasswords WHERE System = '" + system_name +
             "' AND UserName = '" + user_name + "'"
@@ -700,19 +717,20 @@ def remove_user_name(system_name, user_name):
 
 class impersonation:
     """
-    This class allows a script to log in as another user temporarily. It works as a context manager, so 
-    the typical usage will look like this:
+    This class allows a script to log in as another user temporarily. It works as a context manager,
+    so the typical usage will look like this:
 
         with impersonation(user_name, password):
             # Do stuff that requires us to be logged in as user_name
 
-    If you want to stay logged in as another user for the duration of your function's execution, do this:
+    If you want to stay logged in as another user for the duration of your function's execution, do
+    this:
 
         imp = impersonation(user_name, password)
         imp.impersonate()
 
-    This will leave you impersonating user_name until "impersonation" goes out of scope and gets garbage-
-    collected, or until you call imp.revert() or imp.logout().
+    This will leave you impersonating user_name until "impersonation" goes out of scope and gets
+    garbage-collected, or until you call imp.revert() or imp.logout().
 
     If you want to stay logged in until your script exits, without having to keep a reference to an 
     impersonation instance, do this:
@@ -782,7 +800,8 @@ class impersonation:
 
     def login(self):
         """
-        Log in as the user. This just validates the credentials with the OS, but doesn't actually use them.
+        Log in as the user. This just validates the credentials with the OS, but doesn't actually
+        use them.
         """
 
         if self.handle is None:
@@ -796,7 +815,8 @@ class impersonation:
 
     def logout(self):
         """
-        Log out of the user's account. If currently impersonating the user, impersonation is also ended.
+        Log out of the user's account. If currently impersonating the user, impersonation is also
+        ended.
         """
 
         if self.handle is not None:
@@ -814,8 +834,8 @@ class impersonation:
 
     def revert(self):
         """
-        Stop using the credentials. The user is left logged in, which can speed up later impersonations 
-        with the same credentials.
+        Stop using the credentials. The user is left logged in, which can speed up later
+        impersonations with the same credentials.
         """
 
         if self.handle is not None:
@@ -857,5 +877,4 @@ def main():
 
 
 if __name__ == '__main__':
-    if not os.path.isfile(get_master_password_path()):
-        main()
+    main()
