@@ -27,6 +27,7 @@ try:
             # 3rd-party:
             'appdirs',
             'cryptography',
+            'wmi',
 
             # In-house:
         ],
