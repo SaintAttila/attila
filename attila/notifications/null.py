@@ -48,8 +48,8 @@ class NullNotifier(Notifier, Configurable):
 
         return cls(*args, **kwargs)
 
-    def send(self, *args, attachments=None, **kwargs):
+    def __call__(self, *args, attachments=None, **kwargs):
         """
-        Build and send a notification on this notifier's channel.
+        Build and __call__ a notification on this notifier's channel.
         """
         pass  # Just ignore all requests, without action or complaint.

@@ -92,7 +92,7 @@ class LogNotifier(Notifier, Configurable):
         """The logging level this notifier sends at."""
         return self._level
 
-    def send(self, *args, attachments=None, **kwargs):
+    def __call__(self, *args, attachments=None, **kwargs):
         """
         Send a notification on this notifier's channel.
 

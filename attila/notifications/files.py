@@ -87,7 +87,7 @@ class FileNotifier(Notifier, Configurable):
         self._format_string = format_string
         self._file_obj = file_obj
 
-    def send(self, *args, attachments=None, **kwargs):
+    def __call__(self, *args, attachments=None, **kwargs):
         """
         Send a notification on this notifier's channel.
 

@@ -121,7 +121,7 @@ Logic for determining log path:
 
 
 When `attila` comes out, we will specify the location of `.automation` in a `attila.ini` parameter file, which will be
-located through the traditional iter_search_paths paths for Python package parameters. Then, for shops that don't care for our
+located through the traditional iter_config_search_paths paths for Python package parameters. Then, for shops that don't care for our
 settings, they will have the ability to change them. Note that `attila.ini` is distinct from `automation.ini`. The
 `attila.ini` file controls the behavior of the `attila` library, whereas `automation.ini` provides shared parameters for
 all automations built on top of `attila`. In other words, anything shared globally that is used by `attila` itself goes 

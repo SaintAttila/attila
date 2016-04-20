@@ -15,7 +15,7 @@ from ..abc.files import Path
 
 from ..strings import split_port, to_list_of_strings
 from ..configurations import ConfigLoader, get_automation_config_loader
-from ..env import get_entry_point_name
+from ..context import get_entry_point_name
 from ..exceptions import verify_type, OperationNotSupportedError
 
 
@@ -272,12 +272,12 @@ class EmailConnector(Connector, Configurable):
 
     @property
     def sender(self):
-        """The email address to send from."""
+        """The email address to __call__ from."""
         return self._sender
 
     @property
     def to(self):
-        """The email addresses to send to."""
+        """The email addresses to __call__ to."""
         return self._to
 
     @property
@@ -398,7 +398,7 @@ class EmailNotifier(connection, Notifier, Configurable):
         """Whether to add a standard footer to the bottom of the email body."""
         return self._add_footer
 
-    def send(self, *args, attachments=None, **kwargs):
+    def __call__(self, *args, attachments=None, **kwargs):
         """
         Send an email notification on this channel.
 

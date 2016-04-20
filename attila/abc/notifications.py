@@ -15,12 +15,12 @@ __all__ = [
 
 class Notifier(metaclass=ABCMeta):
     """
-    A notifier acts as a template for notifications, formatting the objects it is given into a standardized template
-    and sending the resulting notification on to a particular channel.
+    A notifier acts as a template for notifications, formatting the objects it is given into a standardized
+    template and sending the resulting notification on to a particular channel.
     """
 
     @abstractmethod
-    def send(self, *args, attachments=None, **kwargs):
+    def __call__(self, *args, attachments=None, **kwargs):
         """
         Send a notification on this notifier's channel.
 

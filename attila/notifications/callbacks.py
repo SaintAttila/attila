@@ -11,8 +11,9 @@ __all__ = [
 
 class CallbackNotifier(Notifier, Configurable):
     """
-    A callback channel passes incoming notifications to an arbitrary Python callback. It allows us to wrap Python
-    functions in the notification channel interface so we can easily interchange them.
+    A callback channel passes incoming notifications to an arbitrary Python callback. It allows us
+    to wrap Python functions in the notification channel interface so we can easily interchange
+    them.
     """
 
     @classmethod
@@ -58,7 +59,7 @@ class CallbackNotifier(Notifier, Configurable):
         """The function called by this notifier."""
         return self._callback
 
-    def send(self, *args, **kwargs):
+    def __call__(self, *args, **kwargs):
         """
         Send a notification on this notifier's channel.
 

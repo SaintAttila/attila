@@ -9,7 +9,7 @@ from . import abc
 from . import configurations
 # from . import context
 from . import db
-from . import env
+from . import context
 from . import error_handling
 from . import exceptions
 from . import fs
@@ -33,7 +33,7 @@ __all__ = [
     'configurations',
     'context',
     'db',
-    'env',
+    'context.py',
     'error_handling',
     'exceptions',
     'fs',
