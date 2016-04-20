@@ -1,12 +1,18 @@
+"""
+attila.notifications.logs
+=========================
+
+Bindings for sending notifications to Python logger objects.
+"""
+
+
 import logging
 
 from ..abc.configurations import Configurable
 from ..abc.notifications import Notifier
+
 from ..configurations import ConfigLoader
 from ..exceptions import OperationNotSupportedError, verify_type
-
-
-__author__ = 'Aaron Hosford'
 
 
 class LogNotifier(Notifier, Configurable):
@@ -96,7 +102,8 @@ class LogNotifier(Notifier, Configurable):
         """
         Send a notification on this notifier's channel.
 
-        :param attachments: The file attachments, if any, to include in the notification. (Not supported.)
+        :param attachments: The file attachments, if any, to include in the notification. (Not
+            supported.)
         :return: None
         """
         if attachments is not None:

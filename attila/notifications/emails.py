@@ -1,3 +1,11 @@
+"""
+attila.notifications.emails
+===========================
+
+Bindings for sending email notifications.
+"""
+
+
 import datetime
 import email
 import getpass
@@ -10,8 +18,8 @@ from distutils.util import strtobool
 
 from ..abc.configurations import Configurable
 from ..abc.connections import Connector, connection
-from ..abc.notifications import Notifier
 from ..abc.files import Path
+from ..abc.notifications import Notifier
 
 from ..strings import split_port, to_list_of_strings
 from ..configurations import ConfigLoader, get_automation_config_loader
@@ -33,7 +41,6 @@ __all__ = [
 DEFAULT_EMAIL_PORT = 25
 
 
-# TODO: Register this as an entry point in the attila.config_loaders group.
 def validate_email_address(address):
     """
     Validate an email address. If it is malformed, raise an exception.
@@ -41,14 +48,20 @@ def validate_email_address(address):
     :param address: The address to validate.
     :return: The normalized address string.
     """
-    address = email.utils.parseaddr(address)[1]  # Ignore preceding name, etc. We just want the address.
+
+    # Ignore preceding name, etc. We just want the address.
+    address = email.utils.parseaddr(address)[1]
+
     assert address  # Non-empty string
     assert len(address.split()) == 1  # No spaces
     assert address.count('@') == 1  # Exactly 1 @ sign
+
     user, domain = address.split('@')
+
     assert user  # Non-empty user
     assert '.' in domain  # At least one . in domain
     assert all(domain.split('.'))  # No . at start or end, and at most one . at a time
+
     return address
 
 
@@ -132,8 +145,8 @@ def send_email(server, sender, subject, body, to, cc=None, bcc=None, attachments
 
 def get_standard_footer():
     """
-    Generates a standard add_footer for all automated emails that includes account, server, time stamp,
-    and system (code entry point).
+    Generates a standard add_footer for all automated emails that includes account, server, time
+    stamp, and system (code entry point).
 
     :return: A add_footer, as a string.
     """
@@ -172,7 +185,6 @@ def get_standard_footer():
     return template.format(system=system, account=account, server=server, timestamp=timestamp)
 
 
-# TODO: Register this as an entry point in the attila.config_loaders group.
 def to_email_address_set(value):
     """
     Parse an email address list string.
@@ -186,8 +198,8 @@ def to_email_address_set(value):
 
 class EmailConnector(Connector, Configurable):
     """
-    A channel for sending emails. An email channel keeps track of the server and email addresses, as well
-    as formatting options
+    A channel for sending emails. An email channel keeps track of the server and email addresses, as
+    well as formatting options
     """
 
     @classmethod
@@ -227,7 +239,15 @@ class EmailConnector(Connector, Configurable):
         if port is not None:
             server += ':' + str(port)
 
-        return cls(*args, server=server, sender=sender, to=to, cc=cc, bcc=bcc, use_html=html, **kwargs)
+        return cls(
+            *args,
+            server=server,
+            sender=sender,
+            to=to, cc=cc,
+            bcc=bcc,
+            use_html=html,
+            **kwargs
+        )
 
     def __init__(self, server, sender, to=None, cc=None, bcc=None, use_html=False):
         verify_type(server, str)
@@ -306,8 +326,9 @@ class EmailConnector(Connector, Configurable):
 
 class EmailNotifier(connection, Notifier, Configurable):
     """
-    An email notifier acts as a template for email notifications, formatting the objects it is given into
-    a standardized template and sending the resulting email notification on to a particular destination.
+    An email notifier acts as a template for email notifications, formatting the objects it is given
+    into a standardized template and sending the resulting email notification on to a particular
+    destination.
     """
 
     @classmethod

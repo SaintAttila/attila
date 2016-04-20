@@ -1,5 +1,14 @@
+"""
+attila.notifications.null
+=========================
+
+Bindings for silently dropping notifications.
+"""
+
+
 from ..abc.configurations import Configurable
 from ..abc.notifications import Notifier
+
 from ..configurations import ConfigLoader
 from ..exceptions import verify_type
 
@@ -11,8 +20,8 @@ __all__ = [
 
 class NullNotifier(Notifier, Configurable):
     """
-    A null notifier simply drops all requested notifications, regardless of their content. It's useful as a
-    placeholder for notifications that have been turned off.
+    A null notifier simply drops all requested notifications, regardless of their content. It's
+    useful as a placeholder for notifications that have been turned off.
     """
 
     @classmethod

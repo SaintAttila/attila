@@ -1,13 +1,19 @@
-from distutils.util import strtobool
+"""
+attila.notifications.files
+==========================
 
+Bindings for sending notifications to file objects.
+"""
+
+
+from distutils.util import strtobool
 
 from ..abc.configurations import Configurable
 from ..abc.files import Path
 from ..abc.notifications import Notifier
+
 from ..configurations import ConfigLoader
 from ..exceptions import OperationNotSupportedError, verify_type
-
-__author__ = 'Aaron Hosford'
 
 
 # TODO: Should this inherit from connection?
@@ -64,7 +70,14 @@ class FileNotifier(Notifier, Configurable):
 
         encoding = config_loader.load_option(section, 'Encoding', str, None)
 
-        return cls(*args, path=path, append=append, format_string=format_string, encoding=encoding, **kwargs)
+        return cls(
+            *args,
+            path=path,
+            append=append,
+            format_string=format_string,
+            encoding=encoding,
+            **kwargs
+        )
 
     def __init__(self, path=None, append=True, format_string=None, encoding=None):
         verify_type(append, bool)
@@ -102,4 +115,5 @@ class FileNotifier(Notifier, Configurable):
             self._file_obj.write(self._format_string.format(*args, **kwargs))
 
     def close(self):
+        """Close the file notifier, and its associated file."""
         self._file_obj.close()
