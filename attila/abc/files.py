@@ -16,19 +16,16 @@ from abc import ABCMeta, abstractmethod
 
 from .configurations import Configurable
 from .connections import Connector, connection
+
 from ..configurations import ConfigLoader
 from ..plugins import URL_SCHEMES
-from ..exceptions import PathError, DirectoryNotEmptyError, InvalidPathError, NoDefaultFSConnectionError, verify_type
+from ..exceptions import NoDefaultFSConnectionError, verify_type
 
 
 __all__ = [
     'Path',
     'FSConnector',
     'fs_connection',
-    'PathError',
-    'DirectoryNotEmptyError',
-    'InvalidPathError',
-    'NoDefaultFSConnectionError',
 ]
 
 
@@ -38,12 +35,13 @@ log = logging.getLogger(__name__)
 FORM_FEED_CHAR = '\x0C'
 
 
-# TODO: Use this to make path operations that affect multiple files/folders into atomic operations. The idea is to
-#       record everything that has done and, using temp files, make all operations reversible. If an error occurs
-#       partway through the transaction, the temp files are then used to roll back the operations performed so far.
-#       Otherwise, when all operations have been completed, the temp files are destroyed. Once this class is finished,
-#       we can add an "atomic" flag as a parameter to each of the multi-operation methods of Path, which enables the
-#       use of transactions.
+# TODO: Use this to make path operations that affect multiple files/folders into atomic operations.
+#       The idea is to record everything that has done and, using temp files, make all operations
+#       reversible. If an error occurs partway through the transaction, the temp files are then
+#       used to roll back the operations performed so far. Otherwise, when all operations have been
+#       completed, the temp files are destroyed. Once this class is finished, we can add an
+#       "atomic" flag as a parameter to each of the multi-operation methods of Path, which enables
+#       the use of transactions.
 # class PathTransaction:
 #
 #     def __init__(self):
@@ -55,9 +53,9 @@ FORM_FEED_CHAR = '\x0C'
 
 class temp_cwd:
     """
-    This class just temporarily changes the working directory of a file system connection, and then changes it
-    back. It's meant for use in a with statement. It only exists to allow Paths to be used as 'with' contexts. It is
-    not meant to be a part of this module's public interface.
+    This class just temporarily changes the working directory of a file system connection, and then
+    changes it back. It's meant for use in a with statement. It only exists to allow Paths to be
+    used as 'with' contexts. It is not meant to be a part of this module's public interface.
     """
 
     def __init__(self, path):
@@ -83,8 +81,8 @@ class temp_cwd:
 
 class Path(Configurable):
     """
-    A Path consists of a string representing a location, together with a connection that indicates the object
-    responsible for interfacing with the underlying file system on behalf of the path.
+    A Path consists of a string representing a location, together with a connection that indicates
+    the object responsible for interfacing with the underlying file system on behalf of the path.
     """
 
     _default_connection = None
@@ -417,10 +415,10 @@ class Path(Configurable):
 
     def find(self, include_cwd=True):
         """
-        Try to look up the file system object using the PATH system environment variable. Return the located file system
-        object (as a Path instance) on success or None on failure. (To modify the PATH, go to Start -> Settings ->
-        Control Panel -> System -> Advanced -> Environment Variables, then select PATH in the "System variables" list,
-        and click Edit.)
+        Try to look up the file system object using the PATH system environment variable. Return the
+        located file system object (as a Path instance) on success or None on failure. (To modify
+        the PATH in Windows, go to Start -> Settings -> Control Panel -> System -> Advanced ->
+        Environment Variables, then select PATH in the "System variables" list, and click Edit.)
 
         :param include_cwd: Whether the current working directory be checked before the PATH.
         :return: A Path representing the located object, or None.
@@ -445,7 +443,8 @@ class Path(Configurable):
         """
         return self._connection.glob(self, pattern)
 
-    def open(self, mode='r', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None):
+    def open(self, mode='r', buffering=-1, encoding=None, errors=None, newline=None, closefd=True,
+             opener=None):
         """
         Open the file.
 
@@ -458,7 +457,16 @@ class Path(Configurable):
         :param opener: A custom opener.
         :return: The opened file object.
         """
-        return self._connection.open_file(self, mode, buffering, encoding, errors, newline, closefd, opener)
+        return self._connection.open_file(
+            self,
+            mode,
+            buffering,
+            encoding,
+            errors,
+            newline,
+            closefd,
+            opener
+        )
 
     def read(self, encoding=None):
         """
@@ -512,7 +520,8 @@ class Path(Configurable):
         """
         return self._connection.save(self, lines, overwrite, append, encoding)
 
-    def save_delimited(self, rows, delimiter=',', quote='"', overwrite=False, append=False, encoding=None):
+    def save_delimited(self, rows, delimiter=',', quote='"', overwrite=False, append=False,
+                       encoding=None):
         """
         Save a sequence of rows to a file.
 
@@ -524,7 +533,15 @@ class Path(Configurable):
         :param encoding: The encoding of the file.
         :return: The number of lines written.
         """
-        return self._connection.save_delimited(self, rows, delimiter, quote, overwrite, append, encoding)
+        return self._connection.save_delimited(
+            self,
+            rows,
+            delimiter,
+            quote,
+            overwrite,
+            append,
+            encoding
+        )
 
     def is_available(self, mode='r'):
         """
@@ -536,8 +553,8 @@ class Path(Configurable):
 
     def is_stable(self, interval=None):
         """
-        Watches for file size changes over time.  Returns a Boolean indicating whether the file's size was constant
-        over the given interval.
+        Watches for file size changes over time.  Returns a Boolean indicating whether the file's
+        size was constant over the given interval.
 
         :param interval: The number of seconds to wait between checks. Default is 1 second.
         """
@@ -559,78 +576,89 @@ class Path(Configurable):
         """
         Create a directory at this location.
 
-        :param overwrite: Whether existing files/folders that conflict with this function are to be deleted/overwritten.
-        :param clear: Whether the directory at this location must be empty for the function to be satisfied.
-        :param fill: Whether the necessary parent folder(s) are to be created if the do not exist already.
-        :param check_only: Whether the function should only check if it's possible, or actually perform the operation.
+        :param overwrite: Whether existing files/folders that conflict with this function are to be
+            deleted/overwritten.
+        :param clear: Whether the directory at this location must be empty for the function to be
+            satisfied.
+        :param fill: Whether the necessary parent folder(s) are to be created if the do not exist
+            already.
+        :param check_only: Whether the function should only check if it's possible, or actually
+            perform the operation.
         :return: None
         """
         return self._connection.make_dir(self, overwrite, clear, fill, check_only)
 
     def copy_into(self, destination, overwrite=False, clear=False, fill=True, check_only=None):
         """
-        Recursively copy the folder or file to the destination. The file or folder is added to the destination folder's
-        listing and is not renamed in the process.
+        Recursively copy the folder or file to the destination. The file or folder is added to the
+        destination folder's listing and is not renamed in the process.
 
-        :param destination: The location of the containing folder where this file system object will be copied.
+        :param destination: The location of the containing folder where this file system object will
+            be copied.
         :param overwrite: Whether conflicting files or folders should be overwritten.
         :param clear: Whether pre-existing contents of a folder are considered to be a conflict.
         :param fill: Whether the destination folder is created if it doesn't exist.
-        :param check_only: Whether the function should only check if it's possible, or actually perform the operation.
+        :param check_only: Whether the function should only check if it's possible, or actually
+            perform the operation.
         :return: None
         """
         return self._connection.copy_into(self, destination, overwrite, clear, fill, check_only)
 
     def copy_to(self, destination, overwrite=False, clear=False, fill=True, check_only=None):
         """
-        Recursively copy the folder or file to the destination. The file or folder is renamed to the destination's name
-        in the process if the names differ.
+        Recursively copy the folder or file to the destination. The file or folder is renamed to the
+        destination's name in the process if the names differ.
 
         :param destination: The new location where this file system object will be copied.
         :param overwrite: Whether conflicting files or folders should be overwritten.
         :param clear: Whether pre-existing contents of a folder are considered to be a conflict.
         :param fill: Whether the parent folder is created if it doesn't exist.
-        :param check_only: Whether the function should only check if it's possible, or actually perform the operation.
+        :param check_only: Whether the function should only check if it's possible, or actually
+            perform the operation.
         :return: None
         """
         return self._connection.copy_to(self, destination, overwrite, clear, fill, check_only)
 
     def move_into(self, destination, overwrite=False, clear=False, fill=True, check_only=None):
         """
-        Move the folder or file to the destination. The file or folder is added to the destination folder's listing and
-        is not renamed in the process.
+        Move the folder or file to the destination. The file or folder is added to the destination
+        folder's listing and is not renamed in the process.
 
-        :param destination: The location of the containing folder where this file system object will be moved.
+        :param destination: The location of the containing folder where this file system object will
+            be moved.
         :param overwrite: Whether conflicting files or folders should be overwritten.
         :param clear: Whether pre-existing contents of a folder are considered to be a conflict.
         :param fill: Whether the destination folder is created if it doesn't exist.
-        :param check_only: Whether the function should only check if it's possible, or actually perform the operation.
+        :param check_only: Whether the function should only check if it's possible, or actually
+            perform the operation.
         :return: None
         """
         return self._connection.move_into(self, destination, overwrite, clear, fill, check_only)
 
     def move_to(self, destination, overwrite=False, clear=False, fill=True, check_only=None):
         """
-        Move the folder or file to the destination. The file or folder is renamed to the destination's name in the
-        process if the names differ.
+        Move the folder or file to the destination. The file or folder is renamed to the
+        destination's name in the process if the names differ.
 
         :param destination: The new location where this file system object will be moved.
         :param overwrite: Whether conflicting files or folders should be overwritten.
         :param clear: Whether pre-existing contents of a folder are considered to be a conflict.
         :param fill: Whether the parent folder is created if it doesn't exist.
-        :param check_only: Whether the function should only check if it's possible, or actually perform the operation.
+        :param check_only: Whether the function should only check if it's possible, or actually
+            perform the operation.
         :return: None
         """
         return self._connection.move_to(self, destination, overwrite, clear, fill, check_only)
 
     def find_unique_file(self, pattern='*', most_recent=True):
         """
-        Find a file in the folder matching the given pattern and return it. If no such file is found, return None. If
-        multiple files are found, either disambiguate by recency if most_recent is set, or raise an exception if
-        most_recent is not set.
+        Find a file in the folder matching the given pattern and return it. If no such file is
+        found, return None. If multiple files are found, either disambiguate by recency if
+        most_recent is set, or raise an exception if most_recent is not set.
 
         :param pattern: The pattern which the file must match. Default is '*" (all files).
-        :param most_recent: Whether to use recency to disambiguate when multiple files are matched by the pattern.
+        :param most_recent: Whether to use recency to disambiguate when multiple files are matched
+            by the pattern.
         :return: The uniquely identified file, as a Path instance, or None.
         """
         return self._connection.find_unique_file(self, pattern, most_recent)
@@ -715,9 +743,10 @@ class FSConnector(Connector, Configurable, metaclass=ABCMeta):
 # noinspection PyPep8Naming
 class fs_connection(connection, Configurable, metaclass=ABCMeta):
     """
-    The fs_connection class is an abstract base class for connections to file systems, e.g. local_fs_connection,
-    http_fs_connection, ftp_fs_connection, etc. Classes which inherit from this class are responsible for handling file-
-    system interactions on behalf of Path instances that use them as their respective connection objects.
+    The fs_connection class is an abstract base class for connections to file systems, e.g.
+    local_fs_connection, http_fs_connection, ftp_fs_connection, etc. Classes which inherit from this
+    class are responsible for handling file-system interactions on behalf of Path instances that use
+    them as their respective connection objects.
     """
 
     def __init__(self, connector):
@@ -737,14 +766,16 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
     @property
     def cwd(self):
         """
-        The current working directory of this file system connection, or None if CWD functionality is not supported.
+        The current working directory of this file system connection, or None if CWD functionality
+        is not supported.
         """
         return None
 
     @cwd.setter
     def cwd(self, path):
         """
-        The current working directory of this file system connection, or None if CWD functionality is not supported.
+        The current working directory of this file system connection, or None if CWD functionality
+        is not supported.
         """
         raise NotImplementedError()
 
@@ -764,10 +795,10 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
 
     def find(self, path, include_cwd=True):
         """
-        Try to look up the file system object using the PATH system environment variable. Return the located file system
-        object (as a Path instance) on success or None on failure. (To modify the PATH, go to Start -> Settings ->
-        Control Panel -> System -> Advanced -> Environment Variables, then select PATH in the "System variables" list,
-        and click Edit.)
+        Try to look up the file system object using the PATH system environment variable. Return the
+        located file system object (as a Path instance) on success or None on failure. (To modify
+        the PATH in Windows, go to Start -> Settings -> Control Panel -> System -> Advanced ->
+        Environment Variables, then select PATH in the "System variables" list, and click Edit.)
 
         :param path: The path to operate on.
         :param include_cwd: Whether the current working directory be checked before the PATH.
@@ -819,7 +850,8 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
         :return: The resulting path.
         """
         if path_elements:
-            return Path(os.path.join(*(self.check_path(element) for element in path_elements)), self)
+            return Path(os.path.join(*(self.check_path(element) for element in path_elements)),
+                        self)
         else:
             return Path(connection=self)
 
@@ -1002,8 +1034,8 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
         path = self.check_path(path)
         return [self.join(path, child) for child in self.list(path, pattern)]
 
-    def open_file(self, path, mode='r', buffering=-1, encoding=None, errors=None, newline=None, closefd=True,
-                  opener=None):
+    def open_file(self, path, mode='r', buffering=-1, encoding=None, errors=None, newline=None,
+                  closefd=True, opener=None):
         """
         Open the file.
 
@@ -1058,8 +1090,8 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
         with self.open_file(path, encoding=encoding, newline='') as file_obj:
             reader = csv.reader(file_obj, delimiter=delimiter, quotechar=quote)
 
-            # This is necessary because the reader only keeps a weak reference to the file, which means we can't just
-            # return the reader.
+            # This is necessary because the reader only keeps a weak reference to the file, which
+            # means we can't just return the reader.
             for row in reader:
                 yield row
 
@@ -1096,7 +1128,8 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
                 file_obj.write(line.rstrip('\r\n') + '\n')
             return index + 1
 
-    def save_delimited(self, path, rows, delimiter=',', quote='"', overwrite=False, append=False, encoding=None):
+    def save_delimited(self, path, rows, delimiter=',', quote='"', overwrite=False, append=False,
+                       encoding=None):
         """
         Save a sequence of rows to a file.
 
@@ -1113,7 +1146,8 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
         assert not overwrite or not append
         assert not self.exists(path) or ((overwrite or append) and self.is_file(path))
 
-        with self.open_file(path, mode=('a' if append else 'w'), encoding=encoding, newline='') as file_obj:
+        with self.open_file(path, mode=('a' if append else 'w'), encoding=encoding, newline='') \
+                as file_obj:
             writer = csv.writer(file_obj, delimiter=delimiter, quotechar=quote)
             index = -1
             for index, row in enumerate(rows):
@@ -1142,8 +1176,8 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
         else:
             open_mode = 'r'
 
-        # Try to open the file, then immediately close it again. This will error if the file cannot be accessed, but it
-        # won't change the contents of the file in any case.
+        # Try to open the file, then immediately close it again. This will error if the file cannot
+        # be accessed, but it won't change the contents of the file in any case.
         # noinspection PyBroadException
         try:
             with self.open_file(path, mode=open_mode):
@@ -1153,8 +1187,8 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
 
     def is_stable(self, path, interval=None):
         """
-        Watches for file size changes over time.  Returns a Boolean indicating whether the file's size was constant
-        over the given interval.
+        Watches for file size changes over time.  Returns a Boolean indicating whether the file's
+        size was constant over the given interval.
 
         :param path: The path to operate on.
         :param interval: The number of seconds to wait between checks. Default is 1 second.
@@ -1191,10 +1225,14 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
         Create a directory at this location.
 
         :param path: The path to operate on.
-        :param overwrite: Whether existing files/folders that conflict with this function are to be deleted/overwritten.
-        :param clear: Whether the directory at this location must be empty for the function to be satisfied.
-        :param fill: Whether the necessary parent folder(s) are to be created if the do not exist already.
-        :param check_only: Whether the function should only check if it's possible, or actually perform the operation.
+        :param overwrite: Whether existing files/folders that conflict with this function are to be
+            deleted/overwritten.
+        :param clear: Whether the directory at this location must be empty for the function to be
+            satisfied.
+        :param fill: Whether the necessary parent folder(s) are to be created if the do not exist
+            already.
+        :param check_only: Whether the function should only check if it's possible, or actually
+            perform the operation.
         :return: None
         """
 
@@ -1215,17 +1253,20 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
                 for line in source_file:
                     target_file.write(line)
 
-    def copy_into(self, path, destination, overwrite=False, clear=False, fill=True, check_only=None):
+    def copy_into(self, path, destination, overwrite=False, clear=False, fill=True,
+                  check_only=None):
         """
-        Recursively copy the folder or file to the destination. The file or folder is added to the destination folder's
-        listing and is not renamed in the process.
+        Recursively copy the folder or file to the destination. The file or folder is added to the
+        destination folder's listing and is not renamed in the process.
 
         :param path: The path to operate on.
-        :param destination: The location of the containing folder where this file system object will be copied.
+        :param destination: The location of the containing folder where this file system object will
+            be copied.
         :param overwrite: Whether conflicting files or folders should be overwritten.
         :param clear: Whether pre-existing contents of a folder are considered to be a conflict.
         :param fill: Whether the destination folder is created if it doesn't exist.
-        :param check_only: Whether the function should only check if it's possible, or actually perform the operation.
+        :param check_only: Whether the function should only check if it's possible, or actually
+            perform the operation.
         :return: None
         """
 
@@ -1233,33 +1274,37 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
 
     def copy_to(self, path, destination, overwrite=False, clear=False, fill=True, check_only=None):
         """
-        Recursively copy the folder or file to the destination. The file or folder is renamed to the destination's name
-        in the process if the names differ.
+        Recursively copy the folder or file to the destination. The file or folder is renamed to the
+        destination's name in the process if the names differ.
 
         :param path: The path to operate on.
         :param destination: The new location where this file system object will be copied.
         :param overwrite: Whether conflicting files or folders should be overwritten.
         :param clear: Whether pre-existing contents of a folder are considered to be a conflict.
         :param fill: Whether the parent folder is created if it doesn't exist.
-        :param check_only: Whether the function should only check if it's possible, or actually perform the operation.
+        :param check_only: Whether the function should only check if it's possible, or actually
+            perform the operation.
         :return: None
         """
 
         if check_only is None:
-            # First check to see if it can be done before we actually make any changes. This doesn't make the whole
-            # thing perfectly atomic, but it eliminates most cases where we start to do things and then find out
-            # we shouldn't have.
+            # First check to see if it can be done before we actually make any changes. This doesn't
+            # make the whole thing perfectly atomic, but it eliminates most cases where we start to
+            # do things and then find out we shouldn't have.
+
             self.copy_to(self, destination, overwrite, clear, fill, check_only=True)
-            check_only = False  # If we don't do this, we'll do a redundant check first on each step in the recursion.
+
+            # If we don't do this, we'll do a redundant check first on each step in the recursion.
+            check_only = False
 
         path = self.check_path(path)
 
         assert isinstance(destination, Path)
         assert self.exists(path)
 
-        # Create the target directory, if necessary. Do not clear it, regardless of the clear flag's value, as this is
-        # the new *parent* folder of the file object to be copied, and the clear flag only applies to the copied file
-        # object and its descendants.
+        # Create the target directory, if necessary. Do not clear it, regardless of the clear flag's
+        # value, as this is the new *parent* folder of the file object to be copied, and the clear
+        # flag only applies to the copied file object and its descendants.
         destination.dir.make_dir(overwrite, clear=False, fill=fill, check_only=check_only)
 
         if self.is_dir(path):
@@ -1281,17 +1326,20 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
             if not check_only:
                 self.raw_copy(path, destination)
 
-    def move_into(self, path, destination, overwrite=False, clear=False, fill=True, check_only=None):
+    def move_into(self, path, destination, overwrite=False, clear=False, fill=True,
+                  check_only=None):
         """
-        Move the folder or file to the destination. The file or folder is added to the destination folder's listing and
-        is not renamed in the process.
+        Move the folder or file to the destination. The file or folder is added to the destination
+        folder's listing and is not renamed in the process.
 
         :param path: The path to operate on.
-        :param destination: The location of the containing folder where this file system object will be moved.
+        :param destination: The location of the containing folder where this file system object will
+            be moved.
         :param overwrite: Whether conflicting files or folders should be overwritten.
         :param clear: Whether pre-existing contents of a folder are considered to be a conflict.
         :param fill: Whether the destination folder is created if it doesn't exist.
-        :param check_only: Whether the function should only check if it's possible, or actually perform the operation.
+        :param check_only: Whether the function should only check if it's possible, or actually
+            perform the operation.
         :return: None
         """
 
@@ -1299,15 +1347,16 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
 
     def move_to(self, path, destination, overwrite=False, clear=False, fill=True, check_only=None):
         """
-        Move the folder or file to the destination. The file or folder is renamed to the destination's name in the
-        process if the names differ.
+        Move the folder or file to the destination. The file or folder is renamed to the
+        destination's name in the process if the names differ.
 
         :param path: The path to operate on.
         :param destination: The new location where this file system object will be moved.
         :param overwrite: Whether conflicting files or folders should be overwritten.
         :param clear: Whether pre-existing contents of a folder are considered to be a conflict.
         :param fill: Whether the parent folder is created if it doesn't exist.
-        :param check_only: Whether the function should only check if it's possible, or actually perform the operation.
+        :param check_only: Whether the function should only check if it's possible, or actually
+            perform the operation.
         :return: None
         """
 
@@ -1329,13 +1378,14 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
 
     def find_unique_file(self, path, pattern='*', most_recent=True):
         """
-        Find a file in the folder matching the given pattern and return it. If no such file is found, return None. If
-        multiple files are found, either disambiguate by recency if most_recent is set, or raise an exception if
-        most_recent is not set.
+        Find a file in the folder matching the given pattern and return it. If no such file is
+        found, return None. If multiple files are found, either disambiguate by recency if
+        most_recent is set, or raise an exception if most_recent is not set.
 
         :param path: The path to operate on.
         :param pattern: The pattern which the file must match. Default is '*" (all files).
-        :param most_recent: Whether to use recency to disambiguate when multiple files are matched by the pattern.
+        :param most_recent: Whether to use recency to disambiguate when multiple files are matched
+            by the pattern.
         :return: The uniquely identified file, as a Path instance, or None.
         """
 
@@ -1344,7 +1394,8 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
         if not self.is_dir(path):
             raise NotADirectoryError(path)
 
-        # Get a list of files matching the pattern. Ignore Microsoft Office temporary files, which start with '~$'.
+        # Get a list of files matching the pattern. Ignore Microsoft Office temporary files, which
+        # start with '~$'.
         files = [path for path in self.glob(path, pattern) if not path.name.startswith('~$')]
 
         # If nothing was found, return None
@@ -1368,4 +1419,6 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
             log.info("Most recent file: %s", result)
             return result
         else:
-            raise FileExistsError("Multiple files identified matching the pattern %s in folder %s." % (pattern, path))
+            raise FileExistsError(
+                "Multiple files identified matching the pattern %s in folder %s." % (pattern, path)
+            )

@@ -9,6 +9,7 @@ Interface definition for SQL connections.
 from abc import ABCMeta, abstractmethod
 
 from . import rpc
+
 from ..exceptions import OperationNotSupportedError
 
 
@@ -20,14 +21,15 @@ __all__ = [
 
 class RecordSet(metaclass=ABCMeta):
     """
-    A RecordSet is returned whenever a query is executed. It provides an interface to the selected data. Each row is
-    yielded as a tuple.
+    A RecordSet is returned whenever a query is executed. It provides an interface to the selected
+    data. Each row is yielded as a tuple.
     """
 
     @abstractmethod
     def _next(self):
         """
-        Get the next row in the record set. If no more records are available, raise a StopIteration exception.
+        Get the next row in the record set. If no more records are available, raise a StopIteration
+        exception.
 
         :return: The next row in the record set.
         :rtype: An OrderedDict instance.

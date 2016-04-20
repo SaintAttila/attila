@@ -9,22 +9,19 @@ Interface definition for connectors and connections.
 from abc import ABCMeta, abstractmethod
 
 
-from ..exceptions import ConnectionOpenError, ConnectionNotOpenError, ConnectionReopenError, verify_type
+from ..exceptions import ConnectionOpenError, ConnectionNotOpenError, verify_type
 
 
 __all__ = [
     "Connector",
     "connection",
-    "ConnectionOpenError",
-    "ConnectionNotOpenError",
-    "ConnectionReopenError",
 ]
 
 
 class Connector(metaclass=ABCMeta):
     """
-    The Connector class is an abstract base class for new_instance factories. A Connector represents a particular
-    collection of resources, often residing on another server.
+    The Connector class is an abstract base class for new_instance factories. A Connector represents
+    a particular collection of resources, often residing on another server.
     """
 
     def __init__(self, connection_type):
@@ -38,7 +35,8 @@ class Connector(metaclass=ABCMeta):
 
     def connect(self, *args, **kwargs):
         """
-        Create a newly configured connection and return it. The connection is *not* automatically opened.
+        Create a newly configured connection and return it. The connection is *not* automatically
+        opened.
 
         :return: A new connection instance.
         """
@@ -47,8 +45,8 @@ class Connector(metaclass=ABCMeta):
 
 class connection(metaclass=ABCMeta):
     """
-    The connection class is an abstract base class for connection objects. It represents a link to a particular
-    collection of resources through which those resource can be accessed.
+    The connection class is an abstract base class for connection objects. It represents a link to a
+    particular collection of resources through which those resource can be accessed.
     """
 
     def __init__(self, connector):

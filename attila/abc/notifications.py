@@ -5,6 +5,7 @@ attila.abc.notifications
 Interface definition for notifiers.
 """
 
+
 from abc import ABCMeta, abstractmethod
 
 
@@ -15,8 +16,8 @@ __all__ = [
 
 class Notifier(metaclass=ABCMeta):
     """
-    A notifier acts as a template for notifications, formatting the objects it is given into a standardized
-    template and sending the resulting notification on to a particular channel.
+    A notifier acts as a template for notifications, formatting the objects it is given into a
+    standardized template and sending the resulting notification on to a particular channel.
     """
 
     @abstractmethod

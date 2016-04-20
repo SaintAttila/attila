@@ -5,6 +5,7 @@ attila.abc.rpc
 Interface definition for remote procedure call server connections.
 """
 
+
 from abc import ABCMeta, abstractmethod
 
 from . import connections
@@ -18,7 +19,8 @@ __all__ = [
 # noinspection PyPep8Naming
 class rpc_connection(connections.connection, metaclass=ABCMeta):
     """
-    The rpc_connection class is an abstract base class for connections to remote procedure call servers.
+    The rpc_connection class is an abstract base class for connections to remote procedure call
+    servers.
     """
 
     @abstractmethod

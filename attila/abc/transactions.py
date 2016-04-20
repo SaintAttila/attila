@@ -5,9 +5,11 @@ attila.abc.transactions
 Interface definition for transactional connections.
 """
 
+
 from abc import ABCMeta, abstractmethod
 
 from . import connections
+
 
 __all__ = [
     "transactional_connection",
@@ -17,7 +19,8 @@ __all__ = [
 # noinspection PyPep8Naming
 class transactional_connection(connections.connection, metaclass=ABCMeta):
     """
-    The transactional_connection class is an abstract base class for connections that support transactions.
+    The transactional_connection class is an abstract base class for connections that support
+    transactions.
     """
 
     @abstractmethod
