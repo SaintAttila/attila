@@ -2,12 +2,14 @@
 attila.configurations
 =====================
 
-Supports the automatic loading and configuration of compound objects directly from a configuration file.
+Supports the automatic loading and configuration of compound objects directly from a configuration
+file.
 """
 
 import configparser
 import keyword
 import os
+import threading
 
 from . import plugins
 
@@ -16,7 +18,7 @@ from .abc.configurations import (Configurable, ConfigurationError, InvalidConfig
                                  ObjectNotConfiguredError, ObjectNotReconfigurableError,
                                  NoConfigurableInstanceTypeError)
 from .abc.files import Path
-from .exceptions import verify_type
+from .exceptions import verify_type, verify_callable
 
 
 __author__ = 'Aaron Hosford'
@@ -51,8 +53,11 @@ _CONFIG_EXTENSIONS = (
 _ATTILA_CONFIG_LOADER = None
 _AUTOMATION_CONFIG_LOADER = None
 
+_GLOBALS_LOCK = threading.RLock()
 
-# TODO: Add load_global_value() and load_global_function() as entry points in the attila.config_loaders group.
+
+# TODO: Add load_global_value() and load_global_function() as entry points in the
+#       attila.config_loaders group.
 def load_global_value(name):
     """
     Safely convert a globally defined Python dotted name to the Python value it represents.
@@ -89,14 +94,14 @@ def load_global_function(name):
     :return: The Python function referenced by that name.
     """
     function = load_global_value(name)
-    assert callable(function)
+    verify_callable(function)
     return function
 
 
 def get_default_config_search_dirs(file_name_base=None):
     """
-    Return a list containing the default configuration file search directories for a given config file name
-    base. No checking is performed, so the directories returned may not exist.
+    Return a list containing the default configuration file search directories for a given config
+    file name base. No checking is performed, so the directories returned may not exist.
 
     :param file_name_base: The name of the configuration file, minus the extension.
     :return: A list of directories in where the config file may be located, in order of descending
@@ -108,7 +113,8 @@ def get_default_config_search_dirs(file_name_base=None):
         # Careful with this recursion... We don't want an infinite loop.
         attila_config_loader = get_attila_config_loader()
         option_name = file_name_base.title() + ' Config'
-        config_location = attila_config_loader.load_option('DEFAULT', option_name, str, default=None)
+        config_location = attila_config_loader.load_option('DEFAULT', option_name, str,
+                                                           default=None)
     if file_name_base is None:
         environ_location = None
     else:
@@ -129,7 +135,8 @@ def get_default_config_search_dirs(file_name_base=None):
 
 def iter_config_search_paths(file_name_base, dirs=None, extensions=None):
     """
-    Iterate over the search paths for a configuration file. Only paths that actually exist are included.
+    Iterate over the search paths for a configuration file. Only paths that actually exist are
+    included.
 
     :param file_name_base: The name of the config file, minus the extension.
     :param dirs: The directories in which to search.
@@ -206,12 +213,18 @@ class ConfigLoader:
         self._loaders = plugins.CONFIG_LOADERS if loaders is None else loaders
         self._loaded_instances = {}
         self._fallbacks = fallbacks
+        self._lock = threading.RLock()
 
-    @property
-    def loaders(self):
-        """A mapping (dictionary-like object) which maps from loader names to arbitrary functions or
-        subclasses of Configurable which can be used to load options or sections from a config file."""
-        return self._loaders
+    # TODO: Commented this out because it isn't thread-safe. If a simple workaround can be found,
+    #       use it.
+    # @property
+    # def loaders(self):
+    #     """
+    #     A mapping (dictionary-like object) which maps from loader names to arbitrary functions or
+    #     subclasses of Configurable which can be used to load options or sections from a config
+    # file.
+    #     """
+    #     return self._loaders
 
     @property
     def fallbacks(self):
@@ -243,48 +256,51 @@ class ConfigLoader:
 
     def load_value(self, value, loader=None):
         """
-        Load an arbitrary string value as an object. Behavior is identical to that of the load_option()
-        method, including the ability to redirect to a section via a hashtag, except that the value is
-        not indirectly accessed via a section and option.
+        Load an arbitrary string value as an object. Behavior is identical to that of the
+        load_option() method, including the ability to redirect to a section via a hashtag, except
+        that the value is not indirectly accessed via a section and option.
 
         :param value: The string value to load.
-        :param loader: The (optional) loader used to load the string value (or the section it points to).
-            The loader can be a function, a subclass of Configurable, or the name of a registered loader.
+        :param loader: The (optional) loader used to load the string value (or the section it points
+            to). The loader can be a function, a subclass of Configurable, or the name of a
+            registered loader.
         :return: The loaded object.
         """
         if value.startswith('#'):
             value = value[1:]
             if not value.startswith('#'):
-                self.load_section(value, loader)
+                return self.load_section(value, loader)
 
         if isinstance(loader, str):
             loader = self._loaders[loader]
 
         if isinstance(loader, type) and issubclass(loader, Configurable):
-            return loader.load_config_option(self, value)
+            with self._lock:
+                return loader.load_config_option(self, value)
         else:
             return loader(value)
 
     def load_option(self, section, option, loader=None, default=NotImplemented):
         """
-        Load an option (AKA parameter) from a specific section as an object. If the option value starts
-        with a hash (#), it is treated as a reference to a config section whose value should be loaded
-        and returned. If the option value starts with a double hash (##), the first hash is treated as
-        an escape character and the remainder of the value is loaded instead of being treated as a
-        hashtag. If a loader is provided, it will always be used. If no loader is provided and the
-        value of the option is a hashtag, default section-loading semantics will be used. Otherwise,
-        the value of the option will be returned as an ordinary string (str). Note that if the same
-        option is loaded multiple times with the same loader, the object returned by the first call
-        will be cached and returned again for later calls.
+        Load an option (AKA parameter) from a specific section as an object. If the option value
+        starts with a hash (#), it is treated as a reference to a config section whose value should
+        be loaded and returned. If the option value starts with a double hash (##), the first hash
+        is treated as an escape character and the remainder of the value is loaded instead of being
+        treated as a hashtag. If a loader is provided, it will always be used. If no loader is
+        provided and the value of the option is a hashtag, default section-loading semantics will be
+        used. Otherwise, the value of the option will be returned as an ordinary string (str). Note
+        that if the same option is loaded multiple times with the same loader, the object returned
+        by the first call will be cached and returned again for later calls.
 
         :param section: The name of the section where the option appears.
         :param option: The name of the option to load.
-        :param loader: The (optional) loader used to load the option (or the section it points to). The
-            loader can be a function, a subclass of Configurable, or the name of a registered loader.
-        :param default: The default value to use if the section or option does not exist. If no default
-            value is specified, or the default is set to NotImplemented, an exception will be raised if
-            the section or option does not exist. (Using NotImplemented for this instead of None enables
-            the use of None as a default value.)
+        :param loader: The (optional) loader used to load the option (or the section it points to).
+            The loader can be a function, a subclass of Configurable, or the name of a registered
+            loader.
+        :param default: The default value to use if the section or option does not exist. If no
+            default value is specified, or the default is set to NotImplemented, an exception will
+            be raised if the section or option does not exist. (Using NotImplemented for this
+            instead of None enables the use of None as a default value.)
         :return: The loaded object, or the default value.
         """
         verify_type(section, str, non_empty=True)
@@ -312,15 +328,16 @@ class ConfigLoader:
 
         cache_key = (section, option, loader)
 
-        if cache_key in self._loaded_instances:
-            return self._loaded_instances[cache_key]
+        with self._lock:
+            if cache_key in self._loaded_instances:
+                return self._loaded_instances[cache_key]
 
-        if isinstance(loader, type) and issubclass(loader, Configurable):
-            result = loader.load_config_option(self, content)
-        else:
-            result = loader(content)
+            if isinstance(loader, type) and issubclass(loader, Configurable):
+                result = loader.load_config_option(self, content)
+            else:
+                result = loader(content)
 
-        self._loaded_instances[cache_key] = result
+            self._loaded_instances[cache_key] = result
 
         return result
 
@@ -330,16 +347,16 @@ class ConfigLoader:
         loader is provided, but a Type option appears in the section, the value of the Type option
         is used as the loader. If no loader is indicated by either of these mechanisms, the section
         is loaded as an ordinary dictionary (dict). Note that if the same section is loaded multiple
-        times with the same loader, the object returned by the first call will be cached and returned
-        again for later calls.
+        times with the same loader, the object returned by the first call will be cached and
+        returned again for later calls.
 
         :param section: The name of the section to load.
-        :param loader: The (optional) loader used to load the section. The loader can be a function, a
-            subclass of Configurable, or the name of a registered loader.
-        :param default: The default value to use if the section does not exist. If no default value is
-            specified, or the default is set to NotImplemented, an exception will be raised if the
-            section does not exist. (Using NotImplemented for this instead of None enables the use of
-            None as a default value.)
+        :param loader: The (optional) loader used to load the section. The loader can be a function,
+            a subclass of Configurable, or the name of a registered loader.
+        :param default: The default value to use if the section does not exist. If no default value
+            is specified, or the default is set to NotImplemented, an exception will be raised if
+            the section does not exist. (Using NotImplemented for this instead of None enables the
+            use of None as a default value.)
         :return: The loaded object.
         """
         verify_type(section, str, non_empty=True)
@@ -368,17 +385,18 @@ class ConfigLoader:
                 #       be offered an arbitrary window into the code like this.
                 loader = load_global_function(loader)
 
-        cache_key = (section, None, loader)
+        with self._lock:
+            cache_key = (section, None, loader)
 
-        if cache_key in self._loaded_instances:
-            return self._loaded_instances[cache_key]
+            if cache_key in self._loaded_instances:
+                return self._loaded_instances[cache_key]
 
-        if isinstance(loader, type) and issubclass(loader, Configurable):
-            result = loader.load_config_section(self, section)
-        else:
-            result = loader(content)
+            if isinstance(loader, type) and issubclass(loader, Configurable):
+                result = loader.load_config_section(self, section)
+            else:
+                result = loader(content)
 
-        self._loaded_instances[cache_key] = result
+            self._loaded_instances[cache_key] = result
 
         return result
 
@@ -409,35 +427,37 @@ class ConfigLoader:
 def get_attila_config_loader(error=False, refresh=False):
     """
     Get the configuration loader for the attila package. This is specifically configuring the
-    behavior of attila itself, not for controlling the automations implemented on top of it. If you are
-    looking for the global configuration settings shared among all automations, use
+    behavior of attila itself, not for controlling the automations implemented on top of it. If you
+    are looking for the global configuration settings shared among all automations, use
     get_automation_config_loader() instead.
 
     :param error: Whether to raise exceptions when the parser cannot read a config file.
     :param refresh: Whether to reload the configuration information from disk.
     :return: A ConfigLoader instance which can be used to load the attila-specific config settings.
     """
-    global _ATTILA_CONFIG_LOADER
-    if refresh or _ATTILA_CONFIG_LOADER is None:
-        config = load_config('attila', error=error)
-        _ATTILA_CONFIG_LOADER = ConfigLoader(config)
-    assert isinstance(_ATTILA_CONFIG_LOADER, ConfigLoader)
-    return _ATTILA_CONFIG_LOADER
+    with _GLOBALS_LOCK:
+        global _ATTILA_CONFIG_LOADER
+        if refresh or _ATTILA_CONFIG_LOADER is None:
+            config = load_config('attila', error=error)
+            _ATTILA_CONFIG_LOADER = ConfigLoader(config)
+        assert isinstance(_ATTILA_CONFIG_LOADER, ConfigLoader)
+        return _ATTILA_CONFIG_LOADER
 
 
 def get_automation_config_loader(error=False, refresh=False):
     """
-    Get the configuration loader for settings shared among all automations. This is distinct from the
-    attila config loader, which configures the behavior of attila itself.
+    Get the configuration loader for settings shared among all automations. This is distinct from
+    the attila config loader, which configures the behavior of attila itself.
 
     :param error: Whether to raise exceptions when the parser cannot read a config file.
     :param refresh: Whether to reload the configuration information from disk.
     :return: A ConfigLoader instance which can be used to load the globally shared automation config
         settings.
     """
-    global _AUTOMATION_CONFIG_LOADER
-    if refresh or _AUTOMATION_CONFIG_LOADER is None:
-        config = load_config('automation', error=error)
-        _AUTOMATION_CONFIG_LOADER = ConfigLoader(config)
-    assert isinstance(_AUTOMATION_CONFIG_LOADER, ConfigLoader)
-    return _AUTOMATION_CONFIG_LOADER
+    with _GLOBALS_LOCK:
+        global _AUTOMATION_CONFIG_LOADER
+        if refresh or _AUTOMATION_CONFIG_LOADER is None:
+            config = load_config('automation', error=error)
+            _AUTOMATION_CONFIG_LOADER = ConfigLoader(config)
+        assert isinstance(_AUTOMATION_CONFIG_LOADER, ConfigLoader)
+        return _AUTOMATION_CONFIG_LOADER
