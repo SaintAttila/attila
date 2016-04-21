@@ -13,6 +13,7 @@ import socket
 from distutils.util import strtobool
 from urllib.parse import urlparse
 
+
 from .. import strings
 from . import local
 
@@ -33,8 +34,8 @@ DEFAULT_FTP_PORT = 21
 
 class FTPConnector(FSConnector):
     """
-    Stores the FTP new_instance information as a single object which can then be passed around instead of using multiple
-    parameters to a function.
+    Stores the FTP new_instance information as a single object which can then be passed around
+    instead of using multiple parameters to a function.
     """
 
     @classmethod
@@ -42,9 +43,10 @@ class FTPConnector(FSConnector):
         """
         Load a new Path instance from a URL string.
 
-        The standard format for an FTP URL is "ftp://user:password@host:port/path". However, storing of plaintext
-        passwords in parameters is not permitted, so the format is "ftp://user@host:port/path", where the password is
-        automatically loaded from the password database.
+        The standard format for an FTP URL is "ftp://user:password@host:port/path". However, storing
+        of plaintext passwords in parameters is not permitted, so the format is
+        "ftp://user@host:port/path", where the password is automatically loaded from the password
+        database.
 
         :param config_loader: The ConfigLoader instance.
         :param url: The URL to load.
@@ -160,12 +162,17 @@ class FTPConnector(FSConnector):
         return super().connect()
 
 
-# noinspection PyPep8Naming,PyAbstractClass
+# noinspection PyPep8Naming
 class ftp_connection(fs_connection):
     """
-    An ftp_connection manages the state for a new_instance to an FTP server, providing a standardized interface for
-    interacting with remote files and directories.
+    An ftp_connection manages the state for a new_instance to an FTP server, providing a
+    standardized interface for interacting with remote files and directories.
     """
+
+    @classmethod
+    def get_connector_type(cls):
+        """Get the connector type associated with this connection type."""
+        return FTPConnector
 
     def __init__(self, connector):
         """
@@ -253,8 +260,8 @@ class ftp_connection(fs_connection):
             with open(local_path, 'rb') as local_file:
                 self._session.retrbinary("STOR " + file_name, local_file)
 
-    def open_file(self, path, mode='r', buffering=-1, encoding=None, errors=None, newline=None, closefd=True,
-                  opener=None):
+    def open_file(self, path, mode='r', buffering=-1, encoding=None, errors=None, newline=None,
+                  closefd=True, opener=None):
         """
         Open the file.
 
@@ -273,7 +280,8 @@ class ftp_connection(fs_connection):
         mode = mode.lower()
         path = self.check_path(path)
 
-        # We can't work directly with an FTP file. Instead, we will create a temp file and return it as a proxy.
+        # We can't work directly with an FTP file. Instead, we will create a temp file and return it
+        # as a proxy.
         temp_path = local.local_fs_connection.get_temp_file_path(self.name(path))
 
         # If we're not truncating the file, then we'll need to copy down the data.
@@ -285,8 +293,8 @@ class ftp_connection(fs_connection):
         else:
             writeback = self._upload
 
-        return ProxyFile(Path(path, self), mode, buffering, encoding, errors, newline, closefd, opener,
-                         proxy_path=temp_path, writeback=writeback)
+        return ProxyFile(Path(path, self), mode, buffering, encoding, errors, newline, closefd,
+                         opener, proxy_path=temp_path, writeback=writeback)
 
     def list(self, path, pattern='*'):
         """

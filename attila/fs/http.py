@@ -22,8 +22,9 @@ __all__ = [
 ]
 
 
+# TODO: This doesn't appear to be used. Should it be? If not, remove it.
 # http://msdn.microsoft.com/en-us/library/ie/ms775145(v=vs.85).aspx
-INET_E_DOWNLOAD_FAILURE = 0x800C0008  # TODO: This doesn't appear to be used. Should it be? If not, remove it.
+INET_E_DOWNLOAD_FAILURE = 0x800C0008
 
 
 class HTTPFSConnector(FSConnector):
@@ -61,12 +62,17 @@ class HTTPFSConnector(FSConnector):
         return super().connect()
 
 
-# noinspection PyPep8Naming,PyAbstractClass
+# noinspection PyPep8Naming
 class http_fs_connection(fs_connection):
     """
-    An http_fs_connection handles the underlying interactions with a remote file system accessed via HTTP on
-    behalf of Path instances.
+    An http_fs_connection handles the underlying interactions with a remote file system accessed via
+    HTTP on behalf of Path instances.
     """
+
+    @classmethod
+    def get_connector_type(cls):
+        """Get the connector type associated with this connection type."""
+        return HTTPFSConnector
 
     def __init__(self, connector=None):
         if connector is None:
@@ -92,8 +98,8 @@ class http_fs_connection(fs_connection):
             return NotImplemented
         return isinstance(other, http_fs_connection)
 
-    def open_file(self, path, mode='r', buffering=-1, encoding=None, errors=None, newline=None, closefd=True,
-                  opener=None):
+    def open_file(self, path, mode='r', buffering=-1, encoding=None, errors=None, newline=None,
+                  closefd=True, opener=None):
         """
         Open the file.
 
@@ -112,8 +118,8 @@ class http_fs_connection(fs_connection):
         if mode not in ('r', 'rb'):
             raise ValueError("Unsupported mode: " + repr(mode))
 
-        # We can't work directly with an HTTP file using URLDownloadToFileW(). Instead, we will create a temp file and
-        # return it as a proxy.
+        # We can't work directly with an HTTP file using URLDownloadToFileW(). Instead, we will
+        # create a temp file and return it as a proxy.
         temp_path = local_fs_connection.get_temp_file_path(self.name(path))
 
         # http://msdn.microsoft.com/en-us/library/ie/ms775123(v=vs.85).aspx
@@ -125,12 +131,14 @@ class http_fs_connection(fs_connection):
             )
         elif result != 0:
             raise RuntimeError(
-                "Unspecified error while trying to download " + path + ". (Return code " + str(result) + ")"
+                "Unspecified error while trying to download " + path + ". (Return code " +
+                str(result) + ")"
             )
         elif not temp_path.is_file:
             raise FileNotFoundError(
-                "File appeared to download successfully from " + path + " but could not be found afterward."
+                "File appeared to download successfully from " + path +
+                " but could not be found afterward."
             )
 
-        return ProxyFile(Path(path, self), mode, buffering, encoding, errors, newline, closefd, opener,
-                         proxy_path=temp_path, writeback=None)
+        return ProxyFile(Path(path, self), mode, buffering, encoding, errors, newline, closefd,
+                         opener, proxy_path=temp_path, writeback=None)

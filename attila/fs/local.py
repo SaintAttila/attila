@@ -63,9 +63,14 @@ class LocalFSConnector(FSConnector):
 # noinspection PyPep8Naming
 class local_fs_connection(fs_connection):
     """
-    local_fs_connection implements an interface for the local file system, handling interactions with it on
-    behalf of Path instances.
+    local_fs_connection implements an interface for the local file system, handling interactions
+    with it on behalf of Path instances.
     """
+
+    @classmethod
+    def get_connector_type(cls):
+        """Get the connector type associated with this connection type."""
+        return LocalFSConnector
 
     def __init__(self, connector=None):
         if connector is None:
@@ -94,10 +99,10 @@ class local_fs_connection(fs_connection):
     @property
     def cwd(self):
         """The current working directory of this file system new_instance."""
-        # TODO: Should we track the CWD separately for each instance? The OS itself only provides one CWD per
-        #       process, but for other new_instance types (e.g. FTP) the CWD is a per-new_instance value, and this
-        #       might lead to slight incompatibilities between the different new_instance types which could
-        #       destroy the abstraction I've built.
+        # TODO: Should we track the CWD separately for each instance? The OS itself only provides
+        #       one CWD per process, but for other new_instance types (e.g. FTP) the CWD is a
+        #       per-new_instance value, and this might lead to slight incompatibilities between the
+        #       different new_instance types which could destroy the abstraction I've built.
         return Path(os.getcwd(), self)
 
     @cwd.setter
@@ -108,10 +113,10 @@ class local_fs_connection(fs_connection):
 
     def find(self, path, include_cwd=True):
         """
-        Try to look up the file system object using the PATH system environment variable. Return the located file system
-        object (as a Path instance) on success or None on failure. (To modify the PATH, go to Start -> Settings ->
-        Control Panel -> System -> Advanced -> Environment Variables, then select PATH in the "System variables" list,
-        and click Edit.)
+        Try to look up the file system object using the PATH system environment variable. Return the
+        located file system object (as a Path instance) on success or None on failure. (To modify
+        the PATH, go to Start -> Settings -> Control Panel -> System -> Advanced ->
+        Environment Variables, then select PATH in the "System variables" list, and click Edit.)
 
         :param path: The path to operate on.
         :param include_cwd: Whether the current working directory be checked before the PATH.
@@ -293,8 +298,8 @@ class local_fs_connection(fs_connection):
         assert self.is_dir(path)
         return [Path(match) for match in glob.iglob(os.path.join(path, pattern))]
 
-    def open_file(self, path, mode='r', buffering=-1, encoding=None, errors=None, newline=None, closefd=True,
-                  opener=None):
+    def open_file(self, path, mode='r', buffering=-1, encoding=None, errors=None, newline=None,
+                  closefd=True, opener=None):
         """
         Open the file.
 
@@ -337,20 +342,26 @@ class local_fs_connection(fs_connection):
         Create a directory at this location.
 
         :param path: The path to operate on.
-        :param overwrite: Whether existing files/folders that conflict with this function are to be deleted/overwritten.
-        :param clear: Whether the directory at this location must be empty for the function to be satisfied.
-        :param fill: Whether the necessary parent folder(s) are to be created if the do not exist already.
-        :param check_only: Whether the function should only check if it's possible, or actually perform the operation.
+        :param overwrite: Whether existing files/folders that conflict with this function are to be
+            deleted/overwritten.
+        :param clear: Whether the directory at this location must be empty for the function to be
+            satisfied.
+        :param fill: Whether the necessary parent folder(s) are to be created if the do not exist
+            already.
+        :param check_only: Whether the function should only check if it's possible, or actually
+            perform the operation.
         :return: None
         """
         path = self.check_path(path)
 
         if check_only is None:
-            # First check to see if it can be done before we actually make any changes. This doesn't make the whole
-            # thing perfectly atomic, but it eliminates most cases where we start to do things and then find out
-            # we shouldn't have.
+            # First check to see if it can be done before we actually make any changes. This doesn't
+            # make the whole thing perfectly atomic, but it eliminates most cases where we start to
+            # do things and then find out we shouldn't have.
             self.make_dir(path, overwrite, clear, fill, check_only=True)
-            check_only = False  # If we don't do this, we'll do a redundant check first on each step in the recursion.
+
+            # If we don't do this, we'll do a redundant check first on each step in the recursion.
+            check_only = False
 
         if self.is_dir(path):
             if clear:

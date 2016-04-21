@@ -5,18 +5,14 @@ attila.fs.stdio
 STDIN/STDOUT/STDERR file system support
 """
 
-import glob
-import os
-import shutil
-import stat
+
 import sys
-import tempfile
 
 from urllib.parse import urlparse
 
 from ..abc.files import Path, FSConnector, fs_connection
 from ..configurations import ConfigLoader
-from ..exceptions import DirectoryNotEmptyError, verify_type
+from ..exceptions import verify_type
 
 
 __all__ = [
@@ -61,12 +57,17 @@ class STDIOFSConnector(FSConnector):
         return super().connect()
 
 
-# noinspection PyPep8Naming,PyAbstractClass
+# noinspection PyPep8Naming
 class stdio_fs_connection(fs_connection):
     """
-    stdio_fs_connection implements an interface for the STDIO file system, handling interactions with it on
-    behalf of Path instances.
+    stdio_fs_connection implements an interface for the STDIO file system, handling interactions
+    with it on behalf of Path instances.
     """
+
+    @classmethod
+    def get_connector_type(cls):
+        """Get the connector type associated with this connection type."""
+        return STDIOFSConnector
 
     def __init__(self, connector=None):
         if connector is None:
@@ -129,8 +130,8 @@ class stdio_fs_connection(fs_connection):
         """
         return self.is_file(path)
 
-    def open_file(self, path, mode='r', buffering=-1, encoding=None, errors=None, newline=None, closefd=True,
-                  opener=None):
+    def open_file(self, path, mode='r', buffering=-1, encoding=None, errors=None, newline=None,
+                  closefd=True, opener=None):
         """
         Open the file.
 
@@ -153,7 +154,7 @@ class stdio_fs_connection(fs_connection):
         assert encoding is None
         assert errors is None
         assert newline is None
-        assert closefd == True
+        assert closefd is True
         assert opener is None
 
         if path == 'STDIN':

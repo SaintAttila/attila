@@ -12,12 +12,8 @@ from . import local
 from . import proxies
 from . import temp
 
-from ..abc.files import Path, FSConnector, fs_connection
-from .local import LocalFSConnector, local_fs_connection
-from .proxies import ProxyFile
-from .temp import TempFile
-from ..exceptions import PathError, InvalidPathError, DirectoryNotEmptyError
-
+from ..abc.files import Path
+from .local import local_fs_connection
 
 __all__ = [
     'ftp',
@@ -25,16 +21,6 @@ __all__ = [
     'local',
     'proxies',
     'temp',
-    'Path',
-    'FSConnector',
-    'fs_connection',
-    'LocalFSConnector',
-    'local_fs_connection',
-    'ProxyFile',
-    'TempFile',
-    'PathError',
-    'InvalidPathError',
-    'DirectoryNotEmptyError',
 ]
 
 

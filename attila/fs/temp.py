@@ -106,7 +106,8 @@ class TempFile:
 
     def readline(self, limit=-1):
         """
-        Read a line from the file. If limit is set, and the line length exceeds the limit, return at most limit bytes.
+        Read a line from the file. If limit is set, and the line length exceeds the limit, return at
+         most limit bytes.
 
         :param limit: The maximum number of bytes to return.
         :return: The bytes read.
@@ -117,7 +118,8 @@ class TempFile:
         """
         Call readline() repeatedly until EOF, returning the results in a list.
 
-        :param hint: A *suggested* maximum number of bytes to read. (May not be respected by underlying system call.)
+        :param hint: A *suggested* maximum number of bytes to read. (May not be respected by
+            underlying system call.)
         :return: The bytes read.
         """
         return self._file_obj.readlines(hint)
@@ -142,7 +144,8 @@ class TempFile:
 
     def truncate(self, size=0):
         """
-        Truncate the file. If size is provided, the file is truncated to that size. Otherwise the file is made empty.
+        Truncate the file. If size is provided, the file is truncated to that size. Otherwise the
+        file is made empty.
 
         :param size: The maximum size of the file.
         :return: None

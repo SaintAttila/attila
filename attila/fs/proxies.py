@@ -42,7 +42,10 @@ class ProxyFile(TempFile):
         return self._path
 
     def flush(self):
-        """Flush pending writes to disk. If writeback is set, copy changes from the proxy to the original file."""
+        """
+        Flush pending writes to disk. If writeback is set, copy changes from the proxy to the
+        original file.
+        """
         self._file_obj.flush()
         if self._writeback is not None and self._modified:
             self._writeback(self._path, self._original_path)
