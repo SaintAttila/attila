@@ -5,13 +5,14 @@ attila.resources
 Resource usage statistics.
 """
 
+
 import wmi
 
 
 from .utility import only
 
 
-__author__ = 'Nick Denman'
+__author__ = 'Nick Denman/Aaron Hosford'
 
 
 def get_cpu_usage():
