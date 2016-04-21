@@ -5,11 +5,13 @@ attila.notifications.callbacks
 Bindings for sending notifications to Python callbacks.
 """
 
+
 from ..abc.configurations import Configurable
 from ..abc.notifications import Notifier
 
 from ..configurations import ConfigLoader, load_global_function
 from ..exceptions import verify_type
+
 
 __all__ = [
     'CallbackNotifier',

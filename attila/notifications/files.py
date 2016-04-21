@@ -8,6 +8,7 @@ Bindings for sending notifications to file objects.
 
 from distutils.util import strtobool
 
+
 from ..abc.configurations import Configurable
 from ..abc.files import Path
 from ..abc.notifications import Notifier

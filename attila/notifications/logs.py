@@ -8,6 +8,7 @@ Bindings for sending notifications to Python logger objects.
 
 import logging
 
+
 from ..abc.configurations import Configurable
 from ..abc.notifications import Notifier
 
