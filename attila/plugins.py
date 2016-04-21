@@ -5,21 +5,21 @@ attila.plugins
 Infrastructure for dealing with plugins.
 """
 
-import warnings
-from collections.abc import Mapping
 
 import pkg_resources
+import warnings
+
+from collections.abc import Mapping
+
 
 from .exceptions import PluginExistsError, PluginNotFoundError, InvalidPluginError, verify_type
+
 
 __all__ = [
     'PluginGroup',
     'CONFIG_LOADERS',
     'URL_SCHEMES',
     'load_plugins',
-    'PluginExistsError',
-    'PluginNotFoundError',
-    'InvalidPluginError',
 ]
 
 
