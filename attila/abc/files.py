@@ -19,7 +19,7 @@ from .connections import Connector, connection
 
 from ..configurations import ConfigLoader
 from ..plugins import URL_SCHEMES
-from ..exceptions import NoDefaultFSConnectionError, verify_type
+from ..exceptions import NoDefaultFSConnectionError, OperationNotSupportedError, verify_type
 
 
 __all__ = [
@@ -749,6 +749,46 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
     them as their respective connection objects.
     """
 
+    @classmethod
+    @abstractmethod
+    def get_connector_type(cls):
+        """Get the connector type associated with this connection type."""
+        raise NotImplementedError()
+
+    @classmethod
+    def load_config_value(cls, config_loader, value, *args, **kwargs):
+        """
+        Load a new instance from a config option on behalf of a config loader.
+
+        :param config_loader: An attila.configurations.ConfigLoader instance.
+        :param value: The string value of the option.
+        :return: An instance of this type.
+        """
+        verify_type(config_loader, ConfigLoader)
+        assert isinstance(config_loader, ConfigLoader)
+        verify_type(value, str)
+        connector = config_loader.load_value(value, cls.get_connector_type())
+        return cls(*args, connector=connector, **kwargs)
+
+    @classmethod
+    def load_config_section(cls, config_loader, section, *args, **kwargs):
+        """
+        Load a new instance from a config section on behalf of a config loader.
+
+        :param config_loader: An attila.configurations.ConfigLoader instance.
+        :param section: The name of the section being loaded.
+        :return: An instance of this type.
+        """
+        verify_type(config_loader, ConfigLoader)
+        assert isinstance(config_loader, ConfigLoader)
+        verify_type(section, str, non_empty=True)
+
+        if config_loader.has_option(section, 'Connector'):
+            connector = config_loader.load_option(section, 'Connector', cls.get_connector_type())
+        else:
+            connector = config_loader.load_section(section, cls.get_connector_type())
+        return cls(*args, connector=connector, **kwargs)
+
     def __init__(self, connector):
         assert isinstance(connector, FSConnector)
         super().__init__(connector)
@@ -777,7 +817,7 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
         The current working directory of this file system connection, or None if CWD functionality
         is not supported.
         """
-        raise NotImplementedError()
+        raise OperationNotSupportedError()
 
     def check_path(self, path):
         """
@@ -805,7 +845,7 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
         :return: A Path representing the located object, or None.
         """
 
-        raise NotImplementedError()
+        raise OperationNotSupportedError()
 
     @property
     def temp_dir(self):
@@ -862,7 +902,7 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
         :param path: The path to operate on.
         :return: Whether the path is a directory.
         """
-        raise NotImplementedError()
+        raise OperationNotSupportedError()
 
     def is_file(self, path):
         """
@@ -871,7 +911,7 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
         :param path: The path to operate on.
         :return: Whether the path is a file.
         """
-        raise NotImplementedError()
+        raise OperationNotSupportedError()
 
     def exists(self, path):
         """
@@ -889,7 +929,7 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
         :param path: The path to operate on.
         :return: The protection mode bits.
         """
-        raise NotImplementedError()
+        raise OperationNotSupportedError()
 
     def inode_number(self, path):
         """
@@ -898,7 +938,7 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
         :param path: The path to operate on.
         :return: The inode number.
         """
-        raise NotImplementedError()
+        raise OperationNotSupportedError()
 
     def device(self, path):
         """
@@ -907,7 +947,7 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
         :param path: The path to operate on.
         :return: The device.
         """
-        raise NotImplementedError()
+        raise OperationNotSupportedError()
 
     def hard_link_count(self, path):
         """
@@ -916,7 +956,7 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
         :param path: The path to operate on.
         :return: The number of hard links.
         """
-        raise NotImplementedError()
+        raise OperationNotSupportedError()
 
     def owner_user_id(self, path):
         """
@@ -925,7 +965,7 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
         :param path: The path to operate on.
         :return: The owner's user ID.
         """
-        raise NotImplementedError()
+        raise OperationNotSupportedError()
 
     def owner_group_id(self, path):
         """
@@ -934,7 +974,7 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
         :param path: The path to operate on.
         :return: The owner's group ID.
         """
-        raise NotImplementedError()
+        raise OperationNotSupportedError()
 
     def size(self, path):
         """
@@ -943,7 +983,7 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
         :param path: The path to operate on.
         :return: The size in bytes.
         """
-        raise NotImplementedError()
+        raise OperationNotSupportedError()
 
     def accessed_time(self, path):
         """
@@ -961,7 +1001,7 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
         :param path: The path to operate on.
         :return: The time stamp, as a float.
         """
-        raise NotImplementedError()
+        raise OperationNotSupportedError()
 
     def metadata_changed_time(self, path):
         """
@@ -1021,7 +1061,7 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
         :param pattern: A glob-style pattern against which names must match.
         :return: A list of matching file and directory names.
         """
-        raise NotImplementedError()
+        raise OperationNotSupportedError()
 
     def glob(self, path, pattern='*'):
         """
@@ -1049,7 +1089,7 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
         :param opener: A custom opener.
         :return: The opened file object.
         """
-        raise NotImplementedError()
+        raise OperationNotSupportedError()
 
     def read(self, path, encoding=None):
         """
@@ -1208,7 +1248,7 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
 
         :param path: The path to operate on.
         """
-        raise NotImplementedError()
+        raise OperationNotSupportedError()
 
     def discard(self, path):
         """
@@ -1236,7 +1276,7 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
         :return: None
         """
 
-        raise NotImplementedError()
+        raise OperationNotSupportedError()
 
     def raw_copy(self, path, destination):
         """
