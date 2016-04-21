@@ -8,10 +8,12 @@ Tools for controlling and interacting with Windows processes.
 
 import time
 
+
 import pywintypes
 import win32api
 import win32com.client
 import win32con
+
 
 from .utility import only
 from .exceptions import TooFewItemsError, verify_type, verify_callable
