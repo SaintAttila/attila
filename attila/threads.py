@@ -2,7 +2,8 @@
 attila.threads
 ==============
 
-Classes and functions for multi-threaded environments and inter-thread/process synchronization and communication.
+Classes and functions for multi-threaded environments and inter-thread/process synchronization and
+communication.
 """
 
 import ctypes
@@ -13,6 +14,7 @@ import traceback
 
 from ctypes import wintypes
 
+
 import pythoncom
 import win32con
 import win32event
@@ -20,6 +22,7 @@ import win32event
 
 # This determines what gets imported by "from <module> import *" statements.
 __all__ = [
+    "wait_for_handle",
     "mutex",
     "semaphore",
     "AsyncCall",
@@ -29,11 +32,11 @@ __all__ = [
 
 def wait_for_handle(handle, timeout=None):
     """
-    Wait up to timeout seconds to acquire the handle. Return True if the handle was successfully acquired. Return False
-    if the handle was not acquired due to timeout.
+    Wait up to timeout seconds to acquire the handle. Return True if the handle was successfully
+    acquired. Return False if the handle was not acquired due to timeout.
 
-    This function is not just for mutexes. It works for a variety of resources. For more details see:
-    https://msdn.microsoft.com/en-us/library/windows/desktop/ms687032(v=vs.85).aspx
+    This function is not just for mutexes. It works for a variety of resources. For more details
+    see: https://msdn.microsoft.com/en-us/library/windows/desktop/ms687032(v=vs.85).aspx
 
     :param handle: The Windows object handle to acquire.
     :param timeout: The maximum time in seconds to wait.
@@ -48,10 +51,12 @@ def wait_for_handle(handle, timeout=None):
         timeout_milliseconds = int(max(min(0xFFFFFFFE, timeout * 1000), 1))
 
     # Return Values:
-    #   0 indicates the lock was already available or the other program released the handle intentionally.
+    #   0 indicates the lock was already available or the other program released the handle
+    #       intentionally.
     #   0x80 indicates the other program released the handle when it exited
     #   0x102 indicates the request timed out.
     #   0xFFFFFFFF indicates the function failed, and we should call GetLastError() to see why.
+    #
     #   Any other value indicates an error handling the request in Windows itself.
     status = win32event.WaitForSingleObject(handle, timeout_milliseconds)
 
@@ -65,9 +70,10 @@ def wait_for_handle(handle, timeout=None):
         # Request timed out
         raise False
     elif status == win32con.WAIT_FAILED:
-        # Something else went wrong. We can't look up the error message because it's a separate function call, and for
-        # all we know, a different Python thread took control between the call to WaitForSingleObject and the call to
-        # GetLastError() that would give us more info. So instead, we just give a generic error message.
+        # Something else went wrong. We can't look up the error message because it's a separate
+        # function call, and for all we know, a different Python thread took control between the
+        # call to WaitForSingleObject and the call to GetLastError() that would give us more info.
+        # So instead, we just give a generic error message.
         raise RuntimeError("The handle could not be acquired.")
     else:
         # Something went wrong
@@ -152,10 +158,11 @@ class mutex:
 
     def lock(self, timeout=None):
         """
-        Called to lock the mutex. If timeout is provided, the method will return back True or False to indicate whether
-        the lock was acquired within the indicated time limit. Otherwise, the method will wait indefinitely until
-        successful, which will always return True. An exception will be raised if the lock cannot be acquired for
-        reasons other than a request timeout, where False is returned.
+        Called to lock the mutex. If timeout is provided, the method will return back True or False
+        to indicate whether the lock was acquired within the indicated time limit. Otherwise, the
+        method will wait indefinitely until successful, which will always return True. An exception
+        will be raised if the lock cannot be acquired for reasons other than a request timeout,
+        where False is returned.
 
         :param timeout: The maximum time, in seconds, to wait for the lock.
         :return: Whether the lock was acquired.
@@ -172,7 +179,8 @@ class mutex:
         required."""
         if self._held_count <= 0:
             self._held_count = 0  # Just in case it somehow ended up negative.
-            raise ValueError("mutex " + repr(self._name) + " cannot be released because it is not held.")
+            raise ValueError("mutex " + repr(self._name) +
+                             " cannot be released because it is not held.")
         elif self._held_count > 1:
             self._held_count -= 1
         else:
@@ -194,8 +202,8 @@ class mutex:
         return False  # Indicates that errors should NOT be suppressed.
 
 
-# TODO: This is a kludge built on top of mutex. Revamp it to use the underlying Windows semaphore functionality for
-#       greater efficiency.
+# TODO: This is a kludge built on top of mutex. Revamp it to use the underlying Windows semaphore
+#       functionality for greater efficiency.
 class semaphore:
     """A semaphore is an inter-process lock which up to N running processes can
     own at a time. It is similar to a mutex, except that there
@@ -261,10 +269,10 @@ class semaphore:
 
     def lock(self, timeout=None, interval=.1):
         """
-        Called to lock the semaphore. If timeout is provided, the method will return back True or False to indicate
-        whether a lock was acquired within the indicated time limit. Otherwise, the method will wait indefinitely and
-        will always return True once complete. An exception will be raised if the lock cannot be acquired for reasons
-        other than a request timeout.
+        Called to lock the semaphore. If timeout is provided, the method will return back True or
+        False to indicate whether a lock was acquired within the indicated time limit. Otherwise,
+        the method will wait indefinitely and will always return True once complete. An exception
+        will be raised if the lock cannot be acquired for reasons other than a request timeout.
 
         :param timeout: The maximum time in seconds to wait for the lock.
         :param interval: The time in seconds between polls.
@@ -289,7 +297,8 @@ class semaphore:
         that lock is previously called, after the shared resources are no longer
         required."""
         if self._held_mutex is None:
-            raise ValueError("Semaphore lock for " + repr(self._name) + " cannot be released because it is not held.")
+            raise ValueError("Semaphore lock for " + repr(self._name) +
+                             " cannot be released because it is not held.")
 
         self._held_mutex.unlock()
 
@@ -312,8 +321,8 @@ class semaphore:
 
 class AsyncCall(threading.Thread):
     """
-    A specialized thread to call a function asynchronously and capture the return value or exception info when it
-    becomes available.
+    A specialized thread to call a function asynchronously and capture the return value or exception
+    info when it becomes available.
     """
 
     def __init__(self, group=None, target=None, name=None, args=(), kwargs=None, *, daemon=None):
@@ -345,8 +354,8 @@ class AsyncCall(threading.Thread):
 
 def async(function, *args, **kwargs):
     """
-    Asynchronously call a function, returning an AsyncCall object through which the return value or exception info can
-    be accessed once the call completes.
+    Asynchronously call a function, returning an AsyncCall object through which the return value or
+    exception info can be accessed once the call completes.
 
     :param function: The function to call in the background.
     :param args: The arguments to pass to the function.
