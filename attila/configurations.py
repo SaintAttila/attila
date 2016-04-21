@@ -13,9 +13,7 @@ import os
 import threading
 
 
-from .abc.configurations import Configurable
-from .abc.files import Path
-
+from .abc import files
 from .exceptions import verify_type, verify_callable
 
 from . import plugins
@@ -182,7 +180,7 @@ class ConfigLoader:
     A ConfigLoader provides the ability to load compound objects from a configuration file.
     """
 
-    def __init__(self, config, loaders=None, fallbacks=None):
+    def __init__(self, config, loaders=None, url_schemes=None, fallbacks=None):
         if isinstance(config, str):
             if os.path.isfile(config):
                 path = config
@@ -190,7 +188,7 @@ class ConfigLoader:
                 config.read(path)
             else:
                 config = load_config(file_name_base=config)
-        elif isinstance(config, Path):
+        elif isinstance(config, files.Path):
             path = config
             config = configparser.ConfigParser()
             with path.open() as file:
@@ -203,6 +201,7 @@ class ConfigLoader:
 
         self._config = config
         self._loaders = plugins.CONFIG_LOADERS if loaders is None else loaders
+        self._url_schemes = plugins.URL_SCHEMES if url_schemes is None else url_schemes
         self._loaded_instances = {}
         self._fallbacks = fallbacks
         self._lock = threading.RLock()
@@ -266,11 +265,45 @@ class ConfigLoader:
         if isinstance(loader, str):
             loader = self._loaders[loader]
 
-        if isinstance(loader, type) and issubclass(loader, Configurable):
+        if hasattr(loader, 'load_config_value'):
             with self._lock:
-                return loader.load_config_option(self, value)
+                return loader.load_config_value(self, value)
         else:
             return loader(value)
+
+    def load_path(self, url, scheme=None):
+        """
+        Load a URL string as a Path instance.
+
+        :param url: The url to load.
+        :param scheme: The (optional) scheme to parse the url as.
+        :return: The loaded path.
+        """
+        verify_type(url, str, non_empty=True)
+
+        if callable(scheme):
+            return scheme(url)
+
+        verify_type(scheme, str, non_empty=True, allow_none=True)
+
+        if '://' in url:
+            explicit_scheme = url.split('://')[0]
+            if scheme is None:
+                scheme = explicit_scheme
+            else:
+                assert scheme.lower() == explicit_scheme.lower()
+        elif scheme is None:
+            scheme = 'file'
+
+        scheme_loader = self._url_schemes[scheme]
+        if hasattr(scheme_loader, 'load_url'):
+            with self._lock:
+                path = self._url_schemes[scheme].load_url(self, url)
+        else:
+            path = scheme_loader(url)
+
+        assert isinstance(path, files.Path)
+        return path
 
     def load_option(self, section, option, loader=None, default=NotImplemented):
         """
@@ -324,8 +357,8 @@ class ConfigLoader:
             if cache_key in self._loaded_instances:
                 return self._loaded_instances[cache_key]
 
-            if isinstance(loader, type) and issubclass(loader, Configurable):
-                result = loader.load_config_option(self, content)
+            if hasattr(loader, 'load_config_value'):
+                result = loader.load_config_value(self, content)
             else:
                 result = loader(content)
 
@@ -383,7 +416,7 @@ class ConfigLoader:
             if cache_key in self._loaded_instances:
                 return self._loaded_instances[cache_key]
 
-            if isinstance(loader, type) and issubclass(loader, Configurable):
+            if hasattr(loader, 'load_config_section'):
                 result = loader.load_config_section(self, section)
             else:
                 result = loader(content)

@@ -17,8 +17,7 @@ from abc import ABCMeta, abstractmethod
 from .configurations import Configurable
 from .connections import Connector, connection
 
-from ..configurations import ConfigLoader
-from ..plugins import URL_SCHEMES
+from .. import configurations
 from ..exceptions import NoDefaultFSConnectionError, OperationNotSupportedError, verify_type
 
 
@@ -114,14 +113,7 @@ class Path(Configurable):
         :param value: The string value of the option.
         :return: A new instance of this class.
         """
-        if '://' in value:
-            protocol = value.split('://')[0]
-        else:
-            protocol = 'file'
-
-        path = URL_SCHEMES[protocol].load_url(config_loader, value)
-        assert isinstance(path, Path)
-        return path
+        return config_loader.load_path(value)
 
     @classmethod
     def load_config_section(cls, config_loader, section, *args, **kwargs):
@@ -132,8 +124,8 @@ class Path(Configurable):
         :param section: The name of the section.
         :return: A new instance of this class.
         """
-        verify_type(config_loader, ConfigLoader)
-        assert isinstance(config_loader, ConfigLoader)
+        verify_type(config_loader, configurations.ConfigLoader)
+        assert isinstance(config_loader, configurations.ConfigLoader)
 
         loc = datetime.datetime.now().strftime(config_loader.load_option(section, 'Location', str))
 
@@ -690,7 +682,7 @@ class FSConnector(Connector, Configurable, metaclass=ABCMeta):
         :param value: The string value of the option.
         :return: An instance of this type.
         """
-        verify_type(config_loader, ConfigLoader)
+        verify_type(config_loader, configurations.ConfigLoader)
         verify_type(value, str)
         assert cls is not FSConnector  # Must be a subclass
         return cls(*args, initial_cwd=value, **kwargs)
@@ -704,7 +696,7 @@ class FSConnector(Connector, Configurable, metaclass=ABCMeta):
         :param section: The name of the section being loaded.
         :return: An instance of this type.
         """
-        verify_type(config_loader, ConfigLoader)
+        verify_type(config_loader, configurations.ConfigLoader)
         verify_type(section, str, non_empty=True)
         assert cls is not FSConnector  # Must be a subclass
 
@@ -764,8 +756,8 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
         :param value: The string value of the option.
         :return: An instance of this type.
         """
-        verify_type(config_loader, ConfigLoader)
-        assert isinstance(config_loader, ConfigLoader)
+        verify_type(config_loader, configurations.ConfigLoader)
+        assert isinstance(config_loader, configurations.ConfigLoader)
         verify_type(value, str)
         connector = config_loader.load_value(value, cls.get_connector_type())
         return cls(*args, connector=connector, **kwargs)
@@ -779,8 +771,8 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
         :param section: The name of the section being loaded.
         :return: An instance of this type.
         """
-        verify_type(config_loader, ConfigLoader)
-        assert isinstance(config_loader, ConfigLoader)
+        verify_type(config_loader, configurations.ConfigLoader)
+        assert isinstance(config_loader, configurations.ConfigLoader)
         verify_type(section, str, non_empty=True)
 
         if config_loader.has_option(section, 'Connector'):
