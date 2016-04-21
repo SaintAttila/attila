@@ -16,6 +16,7 @@ from ..abc import transactions
 
 from ..configurations import ConfigLoader
 from ..exceptions import verify_type
+from ..security import credentials
 
 
 __all__ = [
@@ -177,7 +178,7 @@ class ADODBConnector(connections.Connector, configurations.Configurable):
 
         if user is not None:
             credential_string = user + '@' + server + '/adodb'
-            credential = config_loader.load_value(credential_string, 'Credential')
+            credential = config_loader.load_value(credential_string, credentials.Credential)
         else:
             credential = None
 
@@ -210,9 +211,11 @@ class ADODBConnector(connections.Connector, configurations.Configurable):
         driver = config_loader.load_option(section, 'Driver', str, default=None)
         trusted = config_loader.load_option(section, 'Trusted', str, default=None)
 
-        credential = config_loader.load_option(section, 'Credential', 'Credential', default=None)
+        credential = config_loader.load_option(section, 'Credential', credentials.Credential,
+                                               default=None)
         if credential is None:
-            credential = config_loader.load_section(section, loader='Credential', default=None)
+            credential = config_loader.load_section(section, loader=credentials.Credential,
+                                                    default=None)
 
         return cls(
             *args,

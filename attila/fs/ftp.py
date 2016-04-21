@@ -18,9 +18,12 @@ from .. import strings
 from . import local
 
 from ..abc.files import Path, FSConnector, fs_connection
-from .proxies import ProxyFile
+
 from ..configurations import ConfigLoader
 from ..exceptions import verify_type
+from ..security import credentials
+
+from .proxies import ProxyFile
 
 
 __all__ = [
@@ -75,7 +78,7 @@ class FTPConnector(FSConnector):
         assert ':' not in user
 
         credential_string = user + '@' + server + '/ftp'
-        credential = config_loader.load_value(credential_string, 'Credential')
+        credential = config_loader.load_value(credential_string, credentials.Credential)
 
         return Path(path, cls(server + ':' + str(port), credential).connect())
 
@@ -96,7 +99,7 @@ class FTPConnector(FSConnector):
         server = config_loader.load_option(section, 'Server', str)
         port = config_loader.load_option(section, 'Port', int, None)
         passive = bool(config_loader.load_option(section, 'Passive', strtobool, False))
-        credential = config_loader.load_section(section, 'Credential')
+        credential = config_loader.load_section(section, credentials.Credential)
 
         if port is not None:
             server = server + ':' + str(port)
