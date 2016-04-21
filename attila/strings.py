@@ -6,10 +6,18 @@ String parsing, formatting, and matching routines.
 """
 
 
+# TODO: For the date parsers, it would be good to have a standard section in the config file that
+#       determines the default date parser. The DateParser class will need to be Configurable. Also,
+#       a lot of the functions here could/should be registered as config loaders.
+
+
 import ast
 import datetime
 import re
 import time
+
+
+from .exceptions import verify_type
 
 
 def get_type_name(type_obj):
@@ -29,38 +37,44 @@ def get_type_name(type_obj):
         return result
 
 
-def parse_bool(string, default=None):
+def parse_bool(string, default=NotImplemented):
     """
-    Convert a string to a bool. If the string is empty, the default is returned. If the string is not empty and is not
-    a value that can be clearly interpreted as a Boolean value, an exception is raised.
+    Convert a string to a bool. If the string is empty, the default is returned. If the string is
+    not empty and is not a value that can be clearly interpreted as a Boolean value, an exception is
+    raised.
 
     :param string: The string to be parsed as a bool.
     :param default: The value to be returned if the string is empty.
     :return: The parsed bool value.
     """
+    verify_type(string, str, non_empty=(default is NotImplemented))
+
     upper = string.strip().upper()
     if upper in ('Y', 'YES', 'T', 'TRUE', 'ON', '1'):
         return True
     elif upper in ('N', 'NO', 'F', 'FALSE', 'OFF', '0'):
         return False
-    elif not upper:
+    elif not upper and default is not NotImplemented:
         return default
     else:
         raise ValueError("Unrecognized Boolean string: %s" % repr(string))
 
 
-def parse_char(string, default=None):
+def parse_char(string, default=NotImplemented):
     """
-    Convert a string that represents a character, to an actual character. The string can be anything that would be
-    interpreted as a character within a string literal, i.e. the letter a or the escape sequence \t, or it can be an
-    integer ordinal representing a character. If an actual digit character is desired, it must be quoted in the string
-    value. If the string is empty, default will be returned.
+    Convert a string that represents a character, to an actual character. The string can be anything
+    that would be interpreted as a character within a string literal, i.e. the letter a or the
+    escape sequence \t, or it can be an integer ordinal representing a character. If an actual digit
+    character is desired, it must be quoted in the string value. If the string is empty, default
+    will be returned.
 
     :param string: A string that represents a single unicode character.
     :param default: The value to be returned if the string is empty.
     :return: The parsed character value.
     """
-    if not string:
+    verify_type(string, str, non_empty=(default is NotImplemented))
+
+    if not string and default is not NotImplemented:
         return default
 
     try:
@@ -69,7 +83,8 @@ def parse_char(string, default=None):
         result = string
 
     if isinstance(result, int):
-        return chr(result)  # If it's a character ordinal number, return the corresponding character.
+        # If it's a character ordinal number, return the corresponding character.
+        return chr(result)
 
     result = str(result)
 
@@ -79,16 +94,19 @@ def parse_char(string, default=None):
     return result
 
 
-def parse_int(string, default=None):
+def parse_int(string, default=NotImplemented):
     """
-    Convert a string to an integer value. If the string is empty, the default is returned. If the string is not empty
-    and is not a value that can be clearly interpreted as an integer value, an exception is raised.
+    Convert a string to an integer value. If the string is empty, the default is returned. If the
+    string is not empty and is not a value that can be clearly interpreted as an integer value, an
+    exception is raised.
 
     :param string: The string to be parsed as an integer.
     :param default: The value to be returned if the string is empty.
     :return: The parsed integer value.
     """
-    if not string:
+    verify_type(string, str, non_empty=(default is NotImplemented))
+
+    if not string and default is not NotImplemented:
         return default
 
     # ast.literal_eval() lets us use things like '1234 + 5678', and not just straight digits.
@@ -107,7 +125,8 @@ def format_currency(amount, commas=True, currency_sign='$', exact=True, negative
     :param commas: Whether or not commas should be included in the formatted amount.
     :param currency_sign: The currency sign (e.g. '$') to use.
     :param exact: Whether fractional cents should be disallowed.
-    :param negative_parens: Whether parentheses should be used for negative values instead of a negative sign.
+    :param negative_parens: Whether parentheses should be used for negative values instead of a
+        negative sign.
     :return: The formatted currency string.
     """
     digits = str(int(round(amount * 100)))
@@ -177,7 +196,8 @@ def glob_to_regex(pattern, case_sensitive=False, wildcard='*'):
     Convert a glob-style pattern to a compiled regular expression.
 
     :param pattern: A string containing zero or more wildcard characters.
-    :param case_sensitive: A Boolean indicating whether the regex should be case sensitive. Case insensitive by default.
+    :param case_sensitive: A Boolean indicating whether the regex should be case sensitive. Case
+        insensitive by default.
     :param wildcard: The wildcard character. Asterisk (*) by default.
     :return: A compiled regular expression, as returned by re.compile().
     """
@@ -186,7 +206,8 @@ def glob_to_regex(pattern, case_sensitive=False, wildcard='*'):
     assert wildcard
 
     flags = (0 if case_sensitive else re.IGNORECASE)
-    return re.compile('^' + '.*'.join(re.escape(piece) for piece in pattern.split(wildcard)) + '$', flags)
+    return re.compile('^' + '.*'.join(re.escape(piece) for piece in pattern.split(wildcard)) + '$',
+                      flags)
 
 
 def glob_match(pattern, string, case_sensitive=False, wildcard='*'):
@@ -195,7 +216,8 @@ def glob_match(pattern, string, case_sensitive=False, wildcard='*'):
 
     :param pattern: A string containing zero or more wildcard characters.
     :param string: The string that should be matched by the pattern.
-    :param case_sensitive: A Boolean indicating whether the regex should be case sensitive. Case insensitive by default.
+    :param case_sensitive: A Boolean indicating whether the regex should be case sensitive. Case
+        insensitive by default.
     :param wildcard: The wildcard character. Asterisk (*) by default.
     :return: A Boolean indicating whether the pattern matches the string.
     """
@@ -288,9 +310,10 @@ class DateTimeParser:
             try:
                 candidate = time.strptime(string, datetime_format)
 
-                # Ignore candidates with a year too far from our own. This cuts down on cases where a bizarrely
-                # incorrect date would result from mistaking a day + month as a year. For example, Nov. 1, 2012,
-                # expressed in %d%m%Y format, is 11012012, which can be read by format %Y%d%m as Dec. 1, 1101.
+                # Ignore candidates with a year too far from our own. This cuts down on cases where
+                # a bizarrely incorrect date would result from mistaking a day + month as a year.
+                # For example, Nov. 1, 2012, expressed in %d%m%Y format, is 11012012, which can be
+                # read by format %Y%d%m as Dec. 1, 1101.
                 if self.min_year <= candidate <= self.max_year:
                     continue
 
@@ -355,7 +378,8 @@ def parse_datetime(string, parser=None):
     Parse a date/time string, returning a datetime.datetime instance.
 
     :param string: The date/time string to be parsed.
-    :param parser: The parser instance to use. By default, this is a USDateTimeParser instance with default settings.
+    :param parser: The parser instance to use. By default, this is a USDateTimeParser instance with
+        default settings.
     :return: A datetime.datetime instance.
     """
     assert isinstance(string, str)
@@ -372,7 +396,8 @@ def split_port(ip_port, default=None):
 
     :param ip_port: The IP:port pair.
     :param default: The default port if none is specified in the ip_port.
-    :return: A tuple, (IP, port), where IP is a string and port is either an integer or is the default.
+    :return: A tuple, (IP, port), where IP is a string and port is either an integer or is the
+        default.
     """
     assert isinstance(ip_port, str)
     assert ip_port
@@ -387,8 +412,8 @@ def split_port(ip_port, default=None):
 
 def to_list_of_strings(items, normalizer=None):
     """
-    Convert a parameter value, which may be None, a delimited string, or a sequence of non-delimited strings, into a
-    list of unique, non-empty, non-delimited strings.
+    Convert a parameter value, which may be None, a delimited string, or a sequence of non-delimited
+    strings, into a list of unique, non-empty, non-delimited strings.
 
     :param items: The set of items, in whatever form they may take.
     :param normalizer: A function which normalizes the items.
