@@ -1,3 +1,10 @@
+"""
+attila.security.encryption
+==========================
+
+Standardized encryption routines.
+"""
+
 import base64
 import ctypes
 import ctypes.wintypes

@@ -31,15 +31,15 @@ Windows login account.
 """
 
 
-from .encryption import locally_encrypt, locally_decrypt, encrypt, decrypt
-from .passwords import get_master_password, get_password
+from . import credentials
+from . import encryption
+from . import impersonation
+from . import passwords
 
 
 __all__ = [
-    'locally_encrypt',
-    'locally_decrypt',
-    'encrypt',
-    'decrypt',
-    'get_master_password',
-    'get_password',
+    'credentials',
+    'encryption',
+    'impersonation',
+    'passwords',
 ]

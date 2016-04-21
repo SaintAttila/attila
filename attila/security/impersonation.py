@@ -1,8 +1,20 @@
+"""
+attila.security.impersonation
+=============================
+
+Implements the impersonation class for temporarily or semi-permanently logging in with different
+credentials.
+"""
+
+
 import win32con
 import win32security
 
 
-from .passwords import get_password, get_master_password
+from ..configurations import get_automation_config_loader
+from ..exceptions import verify_type
+
+from .credentials import Credential
 
 
 class impersonation:
@@ -28,77 +40,67 @@ class impersonation:
         impersonation.Sustained(user_name, password)
     """
 
-    DEFAULT_USER = 'ERNAMAUTO'
-    DEFAULT_DOMAIN = 'ERICSSON'
-    PASSWORD_SYSTEM = 'Windows'
-    USE_MASTER_PASSWORD = True
-
     _sustained = {}
 
     @classmethod
-    def sustained(cls, user_name=None, password=None, domain=None):
+    def sustained(cls, credential=None):
         """
-        Login as the given user (ERNAMAUTO by default) and leave it logged in.
+        Login as the given user and leave it logged in.
 
-        :param user_name: The account's user name.
-        :param password: The account's password.
-        :param domain: The account's domain.
+        :param credential: The account credential.
         """
 
-        if user_name is None:
-            user_name = cls.DEFAULT_USER
+        if credential is None:
+            config_loader = get_automation_config_loader()
+            credential = \
+                config_loader.load_option('Security', 'Default Login Credential', Credential)
 
-        if domain is None:
-            domain = cls.DEFAULT_DOMAIN
+        verify_type(credential, Credential, non_empty=True)
+        assert isinstance(credential, Credential)
+        assert credential.is_complete
 
-        key = (user_name, domain)
+        key = (credential.user, credential.domain)
 
         if key not in cls._sustained:
-            imp = cls(user_name, password, domain)
+            imp = cls(credential)
             imp.impersonate()
             cls._sustained[key] = imp
 
-    def __init__(self, user_name=None, password=None, domain=None):
+    def __init__(self, credential=None):
         self.handle = None
 
-        if user_name is None:
-            user_name = self.DEFAULT_USER
+        if credential is None:
+            config_loader = get_automation_config_loader()
+            credential = \
+                config_loader.load_option('Security', 'Default Login Credential', Credential)
 
-        if password is None:
-            # noinspection PyBroadException
-            try:
-                password = get_password(self.PASSWORD_SYSTEM, user_name, False)
-            except Exception:
-                if user_name == self.DEFAULT_USER and self.USE_MASTER_PASSWORD:
-                    password = get_master_password(False)
-                else:
-                    raise
+        verify_type(credential, Credential, non_empty=True)
+        assert isinstance(credential, Credential)
+        assert credential.is_complete
 
-        if domain is None:
-            domain = self.DEFAULT_DOMAIN
-
-        self.domain = domain
-        self.user_name = user_name
-        self.password = password
+        self._credential = credential
 
     def __del__(self):
         """
         Called automatically by the garbage collector just before the object is destroyed.
         """
-
         self.logout()
+
+    @property
+    def credential(self):
+        """The Credential instance used to log in."""
+        return self._credential
 
     def login(self):
         """
         Log in as the user. This just validates the credentials with the OS, but doesn't actually
         use them.
         """
-
         if self.handle is None:
             self.handle = win32security.LogonUser(
-                self.user_name,
-                self.domain,
-                self.password,
+                self.credential.user,
+                self.credential.domain,
+                self.credential.password,
                 win32con.LOGON32_LOGON_INTERACTIVE,
                 win32con.LOGON32_PROVIDER_DEFAULT
             )
@@ -108,7 +110,6 @@ class impersonation:
         Log out of the user's account. If currently impersonating the user, impersonation is also
         ended.
         """
-
         if self.handle is not None:
             win32security.RevertToSelf()
             self.handle.Close()
@@ -118,7 +119,6 @@ class impersonation:
         """
         Begin using the credentials. Logs in first if necessary.
         """
-
         self.login()
         win32security.ImpersonateLoggedOnUser(self.handle)
 
@@ -127,7 +127,6 @@ class impersonation:
         Stop using the credentials. The user is left logged in, which can speed up later
         impersonations with the same credentials.
         """
-
         if self.handle is not None:
             win32security.RevertToSelf()
 
@@ -135,7 +134,6 @@ class impersonation:
         """
         Called automatically upon entering a with block.
         """
-
         self.impersonate()
 
     # noinspection PyUnusedLocal
@@ -143,6 +141,5 @@ class impersonation:
         """
         Called automatically upon leaving a with block, whether due to normal execution or an error.
         """
-
         self.revert()
         return False  # Do not suppress errors

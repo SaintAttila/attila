@@ -1,13 +1,31 @@
+"""
+attila.security.passwords
+=========================
+
+Password storage and retrieval.
+"""
+
+# TODO: The SQL queries refer to a System column, but it should be named Domain.
+#       Unfortunately, we already have a database that uses System as the name,
+#       and changing the queries would break our setup. How do we fix this so it
+#       works universally? Something in the config files?
+
+
 import base64
 import getpass
 import os
 
+
 import cryptography.fernet
 
-from .. import configurations
+
 from ..abc.connections import Connector
 from ..abc.files import Path
 from ..exceptions import BadPasswordError, PasswordRequiredError
+
+from .. import configurations
+
+
 from . import encryption
 
 
@@ -62,7 +80,7 @@ def _set_master_password(password):
 
 def set_master_password(password):
     """
-    Sets the master password. Re-encrypts each system password in the database that was encrypted
+    Sets the master password. Re-encrypts each domain password in the database that was encrypted
     with the old master password so that it is accessible with the new master password.
 
     :param password: The new master password.
@@ -76,8 +94,8 @@ def set_master_password(password):
     if password == old_master_password:
         return  # Nothing to do...
 
-    # encrypt the new password with the old one, so that other systems that
-    # use the database can discover it.
+    # Encrypt the new password with the old one, so that other systems that use the database can
+    # discover it.
     set_password(
         'MASTER',
         'MASTER',
@@ -85,18 +103,18 @@ def set_master_password(password):
         refresh_master=False
     )
 
-    # Identify the system passwords that need to be re-encrypted
+    # Identify the domain passwords that need to be re-encrypted
     passwords = []
-    for system_name in get_systems():
-        if system_name == 'MASTER':
+    for domain in get_domains():
+        if domain == 'MASTER':
             # Don't re-encrypt the new master password; it has to be encrypted
             # under the old master password so the other servers can update.
             continue
 
-        for user_name in get_user_names(system_name):
+        for user in get_users(domain):
             try:
                 passwords.append(
-                    (system_name, user_name, get_password(system_name, user_name, False))
+                    (domain, user, get_password(domain, user, False))
                 )
             except cryptography.fernet.InvalidToken:
                 # If it can't be decrypted, odds are we already changed the
@@ -108,10 +126,10 @@ def set_master_password(password):
     # Set the new master password
     _set_master_password(password)
 
-    # Re-encrypt the system passwords and write them back to the table
+    # Re-encrypt the domain passwords and write them back to the table
     while passwords:
-        system_name, user_name, password = passwords.pop()
-        set_password(system_name, user_name, password, refresh_master=False)
+        domain, user, password = passwords.pop()
+        set_password(domain, user, password, refresh_master=False)
         del password
 
 
@@ -143,11 +161,11 @@ def get_master_password(refresh=True):
         return new_password
 
 
-def get_systems():
+def get_domains():
     """
-    Get a set containing the systems for which username/password pairs have been stored.
+    Get a set containing the domains for which username/password pairs have been stored.
 
-    :return: A set containing the system names.
+    :return: A set containing the domain names.
     """
 
     # Query the DB for the username.
@@ -157,14 +175,14 @@ def get_systems():
         return {row[0] for row in results}
 
 
-def get_user_names(system_name, valid=True):
+def get_users(domain, valid=True):
     """
-    Get a set containing the user names for which a password has been stored for the given system.
+    Get a set containing the user names for which a password has been stored for the given domain.
     By default, only user names with valid passwords are returned. If valid is set to False, only
     user names with invalid passwords are returned. (This second option can be used for reporting
     purposes, to identify user names that need fresh passwords and notify the appropriate users.)
 
-    :param system_name: The name of the system for which user names are requested.
+    :param domain: The name of the login domain.
     :param valid: Whether to only include user names with valid passwords.
     :return: The user names.
     """
@@ -174,19 +192,19 @@ def get_user_names(system_name, valid=True):
         # noinspection SqlDialectInspection,SqlNoDataSourceInspection
         results = connection.Execute(
             "SELECT UserName FROM AutomationPasswords WHERE System = '" +
-            system_name + "' AND Valid = " + str(int(valid))
+            domain + "' AND Valid = " + str(int(valid))
         )
         return {row[0] for row in results}
 
 
-def set_password(system_name, user_name, password, valid=True, refresh_master=True):
+def set_password(domain, user, password, valid=True, refresh_master=True):
     """
     Set the password for the given user name. If it already exists, overwrites it. If it doesn't
     exist, adds it. Automatically sets or clears the valid password flag based on the value passed
     in for valid.
 
-    :param system_name: The name of the system.
-    :param user_name: The user name on the system.
+    :param domain: The name of the domain.
+    :param user: The user name on the domain.
     :param password: The password for the user name.
     :param valid: Whether to set the valid flag in the database for this user name.
     :param refresh_master: Whether to refresh the master password in the process.
@@ -214,7 +232,7 @@ def set_password(system_name, user_name, password, valid=True, refresh_master=Tr
         results = list(
             connection.Execute(
                 "SELECT Password FROM AutomationPasswords WHERE System = '" +
-                system_name + "' AND UserName = '" + user_name + "'"
+                domain + "' AND UserName = '" + user + "'"
             )
         )
 
@@ -223,25 +241,25 @@ def set_password(system_name, user_name, password, valid=True, refresh_master=Tr
             connection.Execute(
                 "UPDATE AutomationPasswords SET Password = '" +
                 encrypted_password + "', Valid = " + str(int(valid)) +
-                " WHERE System = '" + system_name + "' AND UserName = '" +
-                user_name + "'"
+                " WHERE System = '" + domain + "' AND UserName = '" +
+                user + "'"
             )
         else:
             # noinspection SqlDialectInspection,SqlNoDataSourceInspection
             connection.Execute(
-                "INSERT INTO AutomationPasswords VALUES('" + system_name + "', '" +
-                user_name + "', '" + encrypted_password + "', " +
+                "INSERT INTO AutomationPasswords VALUES('" + domain + "', '" +
+                user + "', '" + encrypted_password + "', " +
                 str(int(valid)) + ")"
             )
 
 
-def get_password(system, user_name, refresh_master=True):
+def get_password(domain, user, refresh_master=True):
     """
     Get the password for the given username. If no valid password entry exists for this username, an
     exception is raised.
 
-    :param system: The name of the system to be logged into.
-    :param user_name: The user name for which the password is needed.
+    :param domain: The name of the domain to be logged into.
+    :param user: The user name for which the password is needed.
     :param refresh_master: Whether to refresh the master password in the process.
     :return: The password for the user name.
     """
@@ -251,7 +269,7 @@ def get_password(system, user_name, refresh_master=True):
         # noinspection SqlDialectInspection,SqlNoDataSourceInspection
         results = connection.Execute(
             "SELECT Password FROM AutomationPasswords WHERE System = '" +
-            system + "' AND UserName = '" + user_name + "' AND Valid = 1"
+            domain + "' AND UserName = '" + user + "' AND Valid = 1"
         )
         for row in results:
             encrypted_password = base64.b64decode(row[0])
@@ -269,13 +287,13 @@ def get_password(system, user_name, refresh_master=True):
     return encryption.from_bytes(unsalted_password).rstrip()[:-1]
 
 
-def invalidate_password(system_name, user_name):
+def invalidate_password(domain, user):
     """
     Mark the password for the given username as invalid. This should be called whenever a login
     attempt fails and repeated attempts with a bad password could result in account lockout.
 
-    :param system_name: The name of the system.
-    :param user_name: The user name on the system.
+    :param domain: The name of the domain.
+    :param user: The user name on the domain.
     """
 
     # Set the valid password flag to false in the DB.
@@ -283,24 +301,24 @@ def invalidate_password(system_name, user_name):
         # noinspection SqlDialectInspection,SqlNoDataSourceInspection
         connection.Execute(
             "UPDATE AutomationPasswords SET Valid = 0 WHERE System = '" +
-            system_name + "' AND UserName = '" + user_name + "'"
+            domain + "' AND UserName = '" + user + "'"
         )
 
 
-def remove_user_name(system_name, user_name):
+def remove_user(domain, user):
     """
     Remove the username/password pair from the database.
 
-    :param system_name: The name of the system.
-    :param user_name: The user name on the system.
+    :param domain: The name of the domain.
+    :param user: The user name on the domain.
     """
 
     # Delete the username/password from the DB.
     with get_password_database_connector().connect() as connection:
         # noinspection SqlDialectInspection,SqlNoDataSourceInspection
         connection.Execute(
-            "DELETE FROM AutomationPasswords WHERE System = '" + system_name +
-            "' AND UserName = '" + user_name + "'"
+            "DELETE FROM AutomationPasswords WHERE System = '" + domain +
+            "' AND UserName = '" + user + "'"
         )
 
 
