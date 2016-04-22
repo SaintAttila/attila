@@ -29,7 +29,7 @@ try:
 
         # Stuff we definitely have to set by hand:
         description="Saint Attila: Automation Library",
-        license='Ericsson Proprietary - Do Not Distribute',  # TODO: This will be open source. Need to pick a license.
+        license='MIT (https://opensource.org/licenses/MIT)',
         install_requires=[
             # 3rd-party:
             'appdirs',
