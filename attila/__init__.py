@@ -15,7 +15,6 @@ from . import notifications
 from . import plugins
 from . import processes
 from . import progress
-from . import resources
 from . import security
 from . import strings
 from . import threads
@@ -36,7 +35,6 @@ __all__ = [
     'plugins',
     'processes',
     'progress',
-    'resources',
     'security',
     'strings',
     'threads',
