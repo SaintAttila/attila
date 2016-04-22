@@ -10,12 +10,14 @@ import ctypes
 from urllib.parse import urlparse
 
 from ..abc.files import FSConnector, fs_connection
+from ..abc.files import Path
+from ..configurations import ConfigManager
+from ..exceptions import verify_type
+from ..plugins import config_loader, url_scheme
 from .proxies import ProxyFile
 from .local import local_fs_connection
-from ..abc.files import Path
-from ..configurations import ConfigLoader
-from ..exceptions import verify_type
 
+__author__ = 'Aaron Hosford'
 __all__ = [
     'HTTPFSConnector',
     'http_fs_connection',
@@ -27,23 +29,25 @@ __all__ = [
 INET_E_DOWNLOAD_FAILURE = 0x800C0008
 
 
+@config_loader
+@url_scheme('http')
 class HTTPFSConnector(FSConnector):
     """
     Stores the HTTP new_instance information.
     """
 
     @classmethod
-    def load_url(cls, config_loader, url):
+    def load_url(cls, manager, url):
         """
         Load a new Path instance from a URL string.
 
         The standard format for an HTTP URL is "http://host:port/path".
 
-        :param config_loader: The ConfigLoader instance.
+        :param manager: The ConfigManager instance.
         :param url: The URL to load.
         :return: The resultant Path instance.
         """
-        verify_type(config_loader, ConfigLoader)
+        verify_type(manager, ConfigManager)
         verify_type(url, str)
 
         if '://' not in url:
@@ -63,6 +67,7 @@ class HTTPFSConnector(FSConnector):
 
 
 # noinspection PyPep8Naming
+@config_loader
 class http_fs_connection(fs_connection):
     """
     An http_fs_connection handles the underlying interactions with a remote file system accessed via

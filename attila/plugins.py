@@ -15,11 +15,14 @@ from collections.abc import Mapping
 from .exceptions import PluginExistsError, PluginNotFoundError, InvalidPluginError, verify_type
 
 
+__author__ = 'Aaron Hosford'
 __all__ = [
     'PluginGroup',
     'CONFIG_LOADERS',
     'URL_SCHEMES',
     'load_plugins',
+    'config_loader',
+    'url_scheme',
 ]
 
 
@@ -126,6 +129,10 @@ class PluginGroup(Mapping):
         """
 
         assert name is not NotImplemented or value is not NotImplemented
+
+        if value is NotImplemented and not isinstance(name, str):
+            value = name
+            name = NotImplemented
 
         if name is NotImplemented:
             name = value.__name__

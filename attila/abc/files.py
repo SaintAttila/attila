@@ -14,13 +14,15 @@ import time
 
 from abc import ABCMeta, abstractmethod
 
-from .configurations import Configurable
-from .connections import Connector, connection
 
 from .. import configurations
 from ..exceptions import NoDefaultFSConnectionError, OperationNotSupportedError, verify_type
+from ..plugins import config_loader
+from .configurations import Configurable
+from .connections import Connector, connection
 
 
+__author__ = 'Aaron Hosford'
 __all__ = [
     'Path',
     'FSConnector',
@@ -78,6 +80,7 @@ class temp_cwd:
         return False  # Do not suppress exceptions.
 
 
+@config_loader
 class Path(Configurable):
     """
     A Path consists of a string representing a location, together with a connection that indicates
@@ -105,37 +108,37 @@ class Path(Configurable):
         cls._default_connection = connection
 
     @classmethod
-    def load_config_value(cls, config_loader, value, *args, **kwargs):
+    def load_config_value(cls, manager, value, *args, **kwargs):
         """
         Load a class instance from the value of a config option.
 
-        :param config_loader: A ConfigLoader instance.
+        :param manager: A ConfigManager instance.
         :param value: The string value of the option.
         :return: A new instance of this class.
         """
-        return config_loader.load_path(value)
+        return manager.load_path(value)
 
     @classmethod
-    def load_config_section(cls, config_loader, section, *args, **kwargs):
+    def load_config_section(cls, manager, section, *args, **kwargs):
         """
         Load a class instance from a config section.
 
-        :param config_loader: A ConfigLoader instance.
+        :param manager: A ConfigManager instance.
         :param section: The name of the section.
         :return: A new instance of this class.
         """
-        verify_type(config_loader, configurations.ConfigLoader)
-        assert isinstance(config_loader, configurations.ConfigLoader)
+        verify_type(manager, configurations.ConfigManager)
+        assert isinstance(manager, configurations.ConfigManager)
 
-        loc = datetime.datetime.now().strftime(config_loader.load_option(section, 'Location', str))
+        loc = datetime.datetime.now().strftime(manager.load_option(section, 'Location', str))
 
-        con = config_loader.load_option(section, 'Connection', default=None)
+        con = manager.load_option(section, 'Connection', default=None)
         if con is None:
             # If there is no such option, try to load this section as a connection instead.
-            con = config_loader.load_section(section)
+            con = manager.load_section(section)
         elif isinstance(con, str):
             # Treat it as a partial URL.
-            path = cls.load_config_value(config_loader, con)
+            path = cls.load_config_value(manager, con)
             assert not str(path)
             con = path.connection
 
@@ -487,7 +490,7 @@ class Path(Configurable):
         :param encoding: The file encoding used to open the file.
         :return: An iterator over the rows in the file.
         """
-        return self._connection.read_delimited(self, delimiter, quote, encoding)
+        return self._connection.read_rows(self, delimiter, quote, encoding)
 
     def load_delimited(self, delimiter=',', quote='"', encoding=None):
         """
@@ -498,7 +501,7 @@ class Path(Configurable):
         :param encoding: The file encoding used to open the file.
         :return: A list containing the rows in the file.
         """
-        return self._connection.load_delimited(self, delimiter, quote, encoding)
+        return self._connection.load_rows(self, delimiter, quote, encoding)
 
     def save(self, lines, overwrite=False, append=False, encoding=None):
         """
@@ -525,7 +528,7 @@ class Path(Configurable):
         :param encoding: The encoding of the file.
         :return: The number of lines written.
         """
-        return self._connection.save_delimited(
+        return self._connection.save_rows(
             self,
             rows,
             delimiter,
@@ -663,44 +666,44 @@ class FSConnector(Connector, Configurable, metaclass=ABCMeta):
 
     @classmethod
     @abstractmethod
-    def load_url(cls, config_loader, url):
+    def load_url(cls, manager, url):
         """
         Load a new Path instance from a URL string.
 
-        :param config_loader: The ConfigLoader instance.
+        :param manager: The ConfigManager instance.
         :param url: The URL to load.
         :return: The resultant Path instance.
         """
         raise NotImplementedError()
 
     @classmethod
-    def load_config_value(cls, config_loader, value, *args, **kwargs):
+    def load_config_value(cls, manager, value, *args, **kwargs):
         """
         Load a new instance from a config option on behalf of a config loader.
 
-        :param config_loader: An attila.configurations.ConfigLoader instance.
+        :param manager: An attila.configurations.ConfigManager instance.
         :param value: The string value of the option.
         :return: An instance of this type.
         """
-        verify_type(config_loader, configurations.ConfigLoader)
+        verify_type(manager, configurations.ConfigManager)
         verify_type(value, str)
         assert cls is not FSConnector  # Must be a subclass
         return cls(*args, initial_cwd=value, **kwargs)
 
     @classmethod
-    def load_config_section(cls, config_loader, section, *args, **kwargs):
+    def load_config_section(cls, manager, section, *args, **kwargs):
         """
         Load a new instance from a config section on behalf of a config loader.
 
-        :param config_loader: An attila.configurations.ConfigLoader instance.
+        :param manager: An attila.configurations.ConfigManager instance.
         :param section: The name of the section being loaded.
         :return: An instance of this type.
         """
-        verify_type(config_loader, configurations.ConfigLoader)
+        verify_type(manager, configurations.ConfigManager)
         verify_type(section, str, non_empty=True)
         assert cls is not FSConnector  # Must be a subclass
 
-        initial_cwd = config_loader.load_option(section, 'Initial CWD', str, None)
+        initial_cwd = manager.load_option(section, 'Initial CWD', str, None)
 
         return cls(*args, initial_cwd=initial_cwd, **kwargs)
 
@@ -748,37 +751,37 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
         raise NotImplementedError()
 
     @classmethod
-    def load_config_value(cls, config_loader, value, *args, **kwargs):
+    def load_config_value(cls, manager, value, *args, **kwargs):
         """
         Load a new instance from a config option on behalf of a config loader.
 
-        :param config_loader: An attila.configurations.ConfigLoader instance.
+        :param manager: An attila.configurations.ConfigManager instance.
         :param value: The string value of the option.
         :return: An instance of this type.
         """
-        verify_type(config_loader, configurations.ConfigLoader)
-        assert isinstance(config_loader, configurations.ConfigLoader)
+        verify_type(manager, configurations.ConfigManager)
+        assert isinstance(manager, configurations.ConfigManager)
         verify_type(value, str)
-        connector = config_loader.load_value(value, cls.get_connector_type())
+        connector = manager.load_value(value, cls.get_connector_type())
         return cls(*args, connector=connector, **kwargs)
 
     @classmethod
-    def load_config_section(cls, config_loader, section, *args, **kwargs):
+    def load_config_section(cls, manager, section, *args, **kwargs):
         """
         Load a new instance from a config section on behalf of a config loader.
 
-        :param config_loader: An attila.configurations.ConfigLoader instance.
+        :param manager: An attila.configurations.ConfigManager instance.
         :param section: The name of the section being loaded.
         :return: An instance of this type.
         """
-        verify_type(config_loader, configurations.ConfigLoader)
-        assert isinstance(config_loader, configurations.ConfigLoader)
+        verify_type(manager, configurations.ConfigManager)
+        assert isinstance(manager, configurations.ConfigManager)
         verify_type(section, str, non_empty=True)
 
-        if config_loader.has_option(section, 'Connector'):
-            connector = config_loader.load_option(section, 'Connector', cls.get_connector_type())
+        if manager.has_option(section, 'Connector'):
+            connector = manager.load_option(section, 'Connector', cls.get_connector_type())
         else:
-            connector = config_loader.load_section(section, cls.get_connector_type())
+            connector = manager.load_section(section, cls.get_connector_type())
         return cls(*args, connector=connector, **kwargs)
 
     def __init__(self, connector):
@@ -1109,7 +1112,7 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
         """
         return list(self.read(path, encoding))
 
-    def read_delimited(self, path, delimiter=',', quote='"', encoding=None):
+    def read_rows(self, path, delimiter=',', quote='"', encoding=None):
         """
         Return an iterator over the records from the file.
 
@@ -1127,7 +1130,7 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
             for row in reader:
                 yield row
 
-    def load_delimited(self, path, delimiter=',', quote='"', encoding=None):
+    def load_rows(self, path, delimiter=',', quote='"', encoding=None):
         """
         Return a list of the records from the file.
 
@@ -1137,7 +1140,7 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
         :param encoding: The file encoding used to open the file.
         :return: A list containing the rows in the file.
         """
-        return list(self.read_delimited(path, delimiter, quote, encoding))
+        return list(self.read_rows(path, delimiter, quote, encoding))
 
     def save(self, path, lines, overwrite=False, append=False, encoding=None):
         """
@@ -1160,8 +1163,8 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
                 file_obj.write(line.rstrip('\r\n') + '\n')
             return index + 1
 
-    def save_delimited(self, path, rows, delimiter=',', quote='"', overwrite=False, append=False,
-                       encoding=None):
+    def save_rows(self, path, rows, delimiter=',', quote='"', overwrite=False, append=False,
+                  encoding=None):
         """
         Save a sequence of rows to a file.
 

@@ -5,11 +5,17 @@ attila.fs.temp
 Temporary files with automatic cleanup
 """
 
+
 import io
+
 
 from ..abc.files import Path
 
+
 __author__ = 'Aaron Hosford'
+__all__ = [
+    'TempFile',
+]
 
 
 class TempFile:

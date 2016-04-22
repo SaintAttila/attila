@@ -12,64 +12,71 @@ from distutils.util import strtobool
 from ..abc.configurations import Configurable
 from ..abc.files import Path
 from ..abc.notifications import Notifier
-
-from ..configurations import ConfigLoader
+from ..configurations import ConfigManager
 from ..exceptions import OperationNotSupportedError, verify_type
+from ..plugins import config_loader
+
+
+__author__ = 'Aaron Hosford'
+__all__ = [
+    'FileNotifier',
+]
 
 
 # TODO: Should this inherit from connection?
+@config_loader
 class FileNotifier(Notifier, Configurable):
     """
     A file notifier passes incoming notifications to an arbitrary file.
     """
 
     @classmethod
-    def load_config_value(cls, config_loader, value, *args, **kwargs):
+    def load_config_value(cls, manager, value, *args, **kwargs):
         """
         Load a class instance from the value of a config option.
 
-        :param config_loader: A ConfigLoader instance.
+        :param manager: A ConfigManager instance.
         :param value: The string value of the option.
         :return: A new instance of this class.
         """
-        verify_type(config_loader, ConfigLoader)
-        assert isinstance(config_loader, ConfigLoader)
+        verify_type(manager, ConfigManager)
+        assert isinstance(manager, ConfigManager)
         verify_type(value, str, non_empty=True)
 
-        path = Path.load_config_value(config_loader, value)
+        path = Path.load_config_value(manager, value)
         assert isinstance(path, Path)
 
         return cls(*args, path=path, **kwargs)
 
     @classmethod
-    def load_config_section(cls, config_loader, section, *args, **kwargs):
+    def load_config_section(cls, manager, section, *args, **kwargs):
         """
         Load a class instance from a config section.
 
-        :param config_loader: A ConfigLoader instance.
+        :param manager: A ConfigManager instance.
         :param section: The name of the section.
         :return: A new instance of this class.
         """
-        verify_type(config_loader, ConfigLoader)
-        assert isinstance(config_loader, ConfigLoader)
+        verify_type(manager, ConfigManager)
+        assert isinstance(manager, ConfigManager)
         verify_type(section, str, non_empty=True)
 
-        path = config_loader.load_option(section, 'Path', Path, None)
+        path = manager.load_option(section, 'Path', Path, None)
         if path is None:
-            path = config_loader.load_section(section, Path)
+            path = manager.load_section(section, Path)
         assert isinstance(path, Path)
 
-        append = config_loader.load_option(section, 'Append', strtobool, True)
+        append = manager.load_option(section, 'Append', strtobool, True)
 
-        format_string = config_loader.load_option(section, 'Format', str, None)
+        format_string = manager.load_option(section, 'Format', str, None)
         if format_string is None:
-            format_path = config_loader.load_option(section, 'Format Path', Path, None)
+            format_path = manager.load_option(section, 'Format Path', Path, None)
             if format_path is not None:
                 assert isinstance(format_path, Path)
                 with format_path.open():
                     format_string = format_path.read()
 
-        encoding = config_loader.load_option(section, 'Encoding', str, None)
+        encoding = manager.load_option(section, 'Encoding', str, None)
 
         return cls(
             *args,

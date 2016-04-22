@@ -8,9 +8,11 @@ Interface definition for remote procedure call server connections.
 
 from abc import ABCMeta, abstractmethod
 
+
 from . import connections
 
 
+__author__ = 'Aaron Hosford'
 __all__ = [
     "rpc_connection",
 ]

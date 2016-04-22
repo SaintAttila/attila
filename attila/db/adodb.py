@@ -6,6 +6,15 @@ ADODB database interface for Python
 """
 
 
+# TODO: Map databased to the file system interface. The FS interface already supports row-based
+#       reading and writing via the read_rows(), load_rows(), and save_rows() methods. However,
+#       those methods expect quotes and delimiters, which aren't required for row-based data stores
+#       like SQL tables. Maybe they can simply ignore their delimiter and quote parameters? The
+#       question then becomes, what about URLs and SQL queries? There is no doubt that the SQL table
+#       and delimited file paradigms can be mapped to each other. But how far do we take it, and
+#       how complicated is it going to get?
+
+
 import win32com.client
 
 
@@ -13,12 +22,13 @@ from ..abc import connections
 from ..abc import configurations
 from ..abc import sql
 from ..abc import transactions
-
-from ..configurations import ConfigLoader
+from ..configurations import ConfigManager
 from ..exceptions import verify_type
+from ..plugins import config_loader
 from ..security import credentials
 
 
+__author__ = 'Aaron Hosford'
 __all__ = [
     'ADODBRecordSet',
     'ADODBConnector',
@@ -75,6 +85,7 @@ class ADODBRecordSet(sql.RecordSet):
         return result
 
 
+@config_loader
 class ADODBConnector(connections.Connector, configurations.Configurable):
     """
     Stores the ADODB new_instance information for a database as a single object which can then be
@@ -142,16 +153,16 @@ class ADODBConnector(connections.Connector, configurations.Configurable):
         return results
 
     @classmethod
-    def load_config_value(cls, config_loader, value, *args, **kwargs):
+    def load_config_value(cls, manager, value, *args, **kwargs):
         """
         Load a class instance from the value of a config option.
 
-        :param config_loader: A ConfigLoader instance.
+        :param manager: A ConfigManager instance.
         :param value: The string value of the option.
         :return: A new instance of this class.
         """
-        verify_type(config_loader, ConfigLoader)
-        assert isinstance(config_loader, ConfigLoader)
+        verify_type(manager, ConfigManager)
+        assert isinstance(manager, ConfigManager)
 
         verify_type(value, str, non_empty=True)
 
@@ -178,7 +189,7 @@ class ADODBConnector(connections.Connector, configurations.Configurable):
 
         if user is not None:
             credential_string = user + '@' + server + '/adodb'
-            credential = config_loader.load_value(credential_string, credentials.Credential)
+            credential = manager.load_value(credential_string, credentials.Credential)
         else:
             credential = None
 
@@ -193,29 +204,29 @@ class ADODBConnector(connections.Connector, configurations.Configurable):
         )
 
     @classmethod
-    def load_config_section(cls, config_loader, section, *args, **kwargs):
+    def load_config_section(cls, manager, section, *args, **kwargs):
         """
         Load a class instance from a config section.
 
-        :param config_loader: A ConfigLoader instance.
+        :param manager: A ConfigManager instance.
         :param section: The name of the section.
         :return: A new instance of this class.
         """
-        verify_type(config_loader, ConfigLoader)
-        assert isinstance(config_loader, ConfigLoader)
+        verify_type(manager, ConfigManager)
+        assert isinstance(manager, ConfigManager)
 
         verify_type(section, str, non_empty=True)
 
-        server = config_loader.load_option(section, 'Server', str)
-        database = config_loader.load_option(section, 'Database', str)
-        driver = config_loader.load_option(section, 'Driver', str, default=None)
-        trusted = config_loader.load_option(section, 'Trusted', str, default=None)
+        server = manager.load_option(section, 'Server', str)
+        database = manager.load_option(section, 'Database', str)
+        driver = manager.load_option(section, 'Driver', str, default=None)
+        trusted = manager.load_option(section, 'Trusted', str, default=None)
 
-        credential = config_loader.load_option(section, 'Credential', credentials.Credential,
-                                               default=None)
+        credential = manager.load_option(section, 'Credential', credentials.Credential,
+                                         default=None)
         if credential is None:
-            credential = config_loader.load_section(section, loader=credentials.Credential,
-                                                    default=None)
+            credential = manager.load_section(section, loader=credentials.Credential,
+                                              default=None)
 
         return cls(
             *args,
@@ -321,6 +332,7 @@ class ADODBConnector(connections.Connector, configurations.Configurable):
 
 
 # noinspection PyPep8Naming
+@config_loader
 class adodb_connection(sql.sql_connection, transactions.transactional_connection):
     """
     An adodb_connection manages the state for a new_instance to a SQL server via ADODB, providing an

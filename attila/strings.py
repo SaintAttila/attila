@@ -17,7 +17,30 @@ import re
 import time
 
 
-from .exceptions import verify_type
+from .abc.configurations import Configurable
+from .configurations import ConfigManager
+from .exceptions import verify_type, OperationNotSupportedError
+from .plugins import config_loader
+
+
+__author__ = 'Aaron Hosford'
+__all__ = [
+    'get_type_name',
+    'parse_bool',
+    'parse_char',
+    'parse_int',
+    'format_currency',
+    'format_ordinal',
+    'glob_to_regex',
+    'glob_match',
+    'format_english_list',
+    'date_mask_to_format',
+    'DateTimeParser',
+    'USDateTimeParser',
+    'parse_datetime',
+    'split_port',
+    'to_list_of_strings',
+]
 
 
 def get_type_name(type_obj):
@@ -37,6 +60,7 @@ def get_type_name(type_obj):
         return result
 
 
+@config_loader('bool')
 def parse_bool(string, default=NotImplemented):
     """
     Convert a string to a bool. If the string is empty, the default is returned. If the string is
@@ -60,6 +84,7 @@ def parse_bool(string, default=NotImplemented):
         raise ValueError("Unrecognized Boolean string: %s" % repr(string))
 
 
+@config_loader('char')
 def parse_char(string, default=NotImplemented):
     """
     Convert a string that represents a character, to an actual character. The string can be anything
@@ -94,6 +119,7 @@ def parse_char(string, default=NotImplemented):
     return result
 
 
+@config_loader('int')
 def parse_int(string, default=NotImplemented):
     """
     Convert a string to an integer value. If the string is empty, the default is returned. If the
@@ -279,10 +305,58 @@ def date_mask_to_format(mask):
     return mask
 
 
-class DateTimeParser:
+@config_loader
+class DateTimeParser(Configurable):
     """
     A generic parser for date/time strings.
     """
+
+    @classmethod
+    def load_config_value(cls, manager, value, *args, **kwargs):
+        """
+        Load a new instance from a config option on behalf of a config loader.
+
+        :param manager: An attila.configurations.ConfigManager instance.
+        :param value: The string value of the option.
+        :return: An instance of this type.
+        """
+        verify_type(manager, ConfigManager)
+        verify_type(value, str, non_empty=True)
+        formats = [element.strip() for element in value.split(';') if element.strip()]
+        verify_type(formats, list, non_empty=True)
+        return cls(*args, formats=formats, **kwargs)
+
+    @classmethod
+    def load_config_section(cls, manager, section, *args, **kwargs):
+        """
+        Load a new instance from a config section on behalf of a config loader.
+
+        :param manager: An attila.configurations.ConfigManager instance.
+        :param section: The name of the section being loaded.
+        :return: An instance of this type.
+        """
+        verify_type(manager, ConfigManager)
+        assert isinstance(manager, ConfigManager)
+        verify_type(section, str, non_empty=True)
+
+        name = manager.load_option(section, 'Name', str, None)
+
+        delimiter = manager.load_option(section, 'Delimiter', str, None) or ';'
+        verify_type(delimiter, str, non_empty=True)
+
+        formats = manager.load_option(section, 'Formats', str)
+        verify_type(formats, str, non_empty=True)
+
+        formats = [element.strip() for element in formats.split(delimiter) if element.strip()]
+        verify_type(formats, list, non_empty=True)
+
+        result = cls(*args, formats=formats, **kwargs)
+
+        # If a name was given, register the parser instance's parse method as a config loader.
+        if name:
+            manager.add_loader(name, result.parse)
+
+        return result
 
     def __init__(self, formats):
         self.formats = list(formats)
@@ -338,12 +412,51 @@ class DateTimeParser:
         return datetime.datetime.fromtimestamp(timestamp)
 
 
+@config_loader
 class USDateTimeParser(DateTimeParser):
     """
     A generic parser for date/time values expressed in common formats used in the US.
     """
 
+    @classmethod
+    def load_config_value(cls, manager, value, *args, **kwargs):
+        """
+        Load a new instance from a config option on behalf of a config loader.
+
+        :param manager: An attila.configurations.ConfigManager instance.
+        :param value: The string value of the option.
+        :return: An instance of this type.
+        """
+        raise OperationNotSupportedError()
+
+    @classmethod
+    def load_config_section(cls, manager, section, *args, **kwargs):
+        """
+        Load a new instance from a config section on behalf of a config loader.
+
+        :param manager: An attila.configurations.ConfigManager instance.
+        :param section: The name of the section being loaded.
+        :return: An instance of this type.
+        """
+        verify_type(manager, ConfigManager)
+        assert isinstance(manager, ConfigManager)
+        verify_type(section, str, non_empty=True)
+
+        name = manager.load_option(section, 'Name', str, None)
+
+        two_digit_year = manager.load_option(section, 'Two-Digit Year', parse_bool, False)
+
+        result = cls(*args, formats=two_digit_year, **kwargs)
+
+        # If a name was given, register the parser instance's parse method as a config loader.
+        if name:
+            manager.add_loader(name, result.parse)
+
+        return result
+
     def __init__(self, two_digit_year=False):
+        verify_type(two_digit_year, bool)
+
         date_formats = [
             '%b %d, %Y',
             '%B %d, %Y',
@@ -373,6 +486,7 @@ class USDateTimeParser(DateTimeParser):
         super().__init__(formats)
 
 
+@config_loader('datetime')
 def parse_datetime(string, parser=None):
     """
     Parse a date/time string, returning a datetime.datetime instance.
@@ -382,11 +496,10 @@ def parse_datetime(string, parser=None):
         default settings.
     :return: A datetime.datetime instance.
     """
-    assert isinstance(string, str)
+    verify_type(string, str, non_empty=True)
     if parser is None:
         parser = USDateTimeParser()
-    else:
-        assert isinstance(parser, DateTimeParser)
+    verify_type(parser, DateTimeParser)
     return parser.parse(string)
 
 

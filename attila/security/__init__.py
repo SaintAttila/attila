@@ -37,6 +37,7 @@ from . import impersonation
 from . import passwords
 
 
+__author__ = 'Aaron Hosford'
 __all__ = [
     'credentials',
     'encryption',

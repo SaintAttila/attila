@@ -11,14 +11,20 @@ import collections
 
 from ..abc.configurations import Configurable
 from ..abc.files import Path
-
-from ..configurations import ConfigLoader
+from ..configurations import ConfigManager
 from ..exceptions import verify_type
-
+from ..plugins import config_loader
 from . import encryption
 from . import passwords
 
 
+__author__ = 'Aaron Hosford'
+__all__ = [
+    'Credential',
+]
+
+
+@config_loader
 class Credential(collections.namedtuple('Credential', 'user password domain'), Configurable):
     """
     A Credential is a user/password pair. It's handy for passing around to reduce the number of
@@ -32,16 +38,16 @@ class Credential(collections.namedtuple('Credential', 'user password domain'), C
     domain = None
 
     @classmethod
-    def load_config_value(cls, config_loader, value, *args, **kwargs):
+    def load_config_value(cls, manager, value, *args, **kwargs):
         """
         Load a new instance from a config option on behalf of a config loader.
 
-        :param config_loader: An attila.configurations.ConfigLoader instance.
+        :param manager: An attila.configurations.ConfigManager instance.
         :param value: The string value of the option.
         :return: An instance of this type.
         """
-        verify_type(config_loader, ConfigLoader)
-        assert isinstance(config_loader, ConfigLoader)
+        verify_type(manager, ConfigManager)
+        assert isinstance(manager, ConfigManager)
         verify_type(value, str, non_empty=True)
 
         user, system_name = value.split('@')
@@ -52,29 +58,29 @@ class Credential(collections.namedtuple('Credential', 'user password domain'), C
         return cls(*args, user=user, password=password, **kwargs)
 
     @classmethod
-    def load_config_section(cls, config_loader, section, *args, **kwargs):
+    def load_config_section(cls, manager, section, *args, **kwargs):
         """
         Load a new instance from a config section on behalf of a config loader.
 
-        :param config_loader: An attila.configurations.ConfigLoader instance.
+        :param manager: An attila.configurations.ConfigManager instance.
         :param section: The name of the section being loaded.
         :return: An instance of this type.
         """
-        verify_type(config_loader, ConfigLoader)
-        assert isinstance(config_loader, ConfigLoader)
+        verify_type(manager, ConfigManager)
+        assert isinstance(manager, ConfigManager)
         verify_type(section, str, non_empty=True)
 
-        user = config_loader.load_option(section, 'User')
+        user = manager.load_option(section, 'User')
 
         # There are two options for getting a password: Load it from the password database, or from
         # a locally-encrypted password file. If it's from the database, we need a system name. If
         # it's from a file, we need a file path.
-        if config_loader.has_option(section, 'Password Path'):
-            path = config_loader.load_option(section, 'Password Path', Path)
+        if manager.has_option(section, 'Password Path'):
+            path = manager.load_option(section, 'Password Path', Path)
             with path.open(mode='rb') as password_file:
                 password = encryption.locally_decrypt(password_file.read())
         else:
-            system_name = config_loader.load_option(section, 'System Name', str)
+            system_name = manager.load_option(section, 'System Name', str)
             password = passwords.get_password(system_name, user)
 
         return cls(*args, user=user, password=password, **kwargs)

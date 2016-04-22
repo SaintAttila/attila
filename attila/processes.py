@@ -19,6 +19,7 @@ from .utility import only
 from .exceptions import TooFewItemsError, verify_type, verify_callable
 
 
+__author__ = 'Aaron Hosford'
 __all__ = [
     "process_exists",
     "count_processes",

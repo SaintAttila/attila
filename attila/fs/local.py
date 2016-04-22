@@ -14,33 +14,37 @@ import tempfile
 from urllib.parse import urlparse
 
 from ..abc.files import Path, FSConnector, fs_connection
-from ..configurations import ConfigLoader
+from ..configurations import ConfigManager
 from ..exceptions import DirectoryNotEmptyError, verify_type
+from ..plugins import config_loader, url_scheme
 
 
+__author__ = 'Aaron Hosford'
 __all__ = [
     'LocalFSConnector',
     'local_fs_connection',
 ]
 
 
+@config_loader
+@url_scheme('file')
 class LocalFSConnector(FSConnector):
     """
     Stores the local files system new_instance information.
     """
 
     @classmethod
-    def load_url(cls, config_loader, url):
+    def load_url(cls, manager, url):
         """
         Load a new Path instance from a URL string.
 
         The standard format for a local URL is "file://path".
 
-        :param config_loader: The ConfigLoader instance.
+        :param manager: The ConfigManager instance.
         :param url: The URL to load.
         :return: The resultant Path instance.
         """
-        verify_type(config_loader, ConfigLoader)
+        verify_type(manager, ConfigManager)
         verify_type(url, str)
 
         if '://' not in url:
@@ -61,6 +65,7 @@ class LocalFSConnector(FSConnector):
 
 
 # noinspection PyPep8Naming
+@config_loader
 class local_fs_connection(fs_connection):
     """
     local_fs_connection implements an interface for the local file system, handling interactions

@@ -16,10 +16,11 @@ from functools import wraps
 
 from .abc.files import Path
 
-from .configurations import get_automation_config_loader, ConfigLoader
+from .configurations import get_automation_config_manager, ConfigManager
 from .exceptions import verify_type, verify_callable
 
 
+__author__ = 'Aaron Hosford'
 __all__ = [
     'get_entry_point_name',
     'task',
@@ -258,17 +259,17 @@ class automation:
         verify_type(name, str, non_empty=True)
 
         if config_loader is None:
-            local_config_loader = ConfigLoader(name)
-        elif not isinstance(config_loader, ConfigLoader):
-            local_config_loader = ConfigLoader(config_loader)
+            local_config_loader = ConfigManager(name)
+        elif not isinstance(config_loader, ConfigManager):
+            local_config_loader = ConfigManager(config_loader)
         else:
             local_config_loader = config_loader
-        verify_type(local_config_loader, ConfigLoader)
+        verify_type(local_config_loader, ConfigManager)
 
-        shared_config_loader = get_automation_config_loader()
+        shared_config_loader = get_automation_config_manager()
 
         # Combine the config loaders into a default hierarchy.
-        config_loader = ConfigLoader(
+        config_loader = ConfigManager(
             configparser.ConfigParser(),
             fallbacks=[local_config_loader, shared_config_loader]
         )
@@ -375,7 +376,7 @@ class automation:
         """
         The config loader for this automation's settings.
 
-        :return: A ConfigLoader instance.
+        :return: A ConfigManager instance.
         """
         return self._config_loader
 

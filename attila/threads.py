@@ -20,7 +20,7 @@ import win32con
 import win32event
 
 
-# This determines what gets imported by "from <module> import *" statements.
+__author__ = 'Aaron Hosford'
 __all__ = [
     "wait_for_handle",
     "mutex",

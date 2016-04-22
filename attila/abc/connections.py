@@ -12,6 +12,7 @@ from abc import ABCMeta, abstractmethod
 from ..exceptions import ConnectionOpenError, ConnectionNotOpenError, verify_type
 
 
+__author__ = 'Aaron Hosford'
 __all__ = [
     "Connector",
     "connection",

@@ -19,13 +19,15 @@ from . import local
 
 from ..abc.files import Path, FSConnector, fs_connection
 
-from ..configurations import ConfigLoader
+from ..configurations import ConfigManager
 from ..exceptions import verify_type
+from ..plugins import config_loader, url_scheme
 from ..security import credentials
-
 from .proxies import ProxyFile
 
 
+
+__author__ = 'Aaron Hosford'
 __all__ = [
     'FTPConnector',
     'ftp_connection',
@@ -35,6 +37,8 @@ __all__ = [
 DEFAULT_FTP_PORT = 21
 
 
+@config_loader
+@url_scheme('ftp')
 class FTPConnector(FSConnector):
     """
     Stores the FTP new_instance information as a single object which can then be passed around
@@ -42,7 +46,7 @@ class FTPConnector(FSConnector):
     """
 
     @classmethod
-    def load_url(cls, config_loader, url):
+    def load_url(cls, manager, url):
         """
         Load a new Path instance from a URL string.
 
@@ -51,11 +55,11 @@ class FTPConnector(FSConnector):
         "ftp://user@host:port/path", where the password is automatically loaded from the password
         database.
 
-        :param config_loader: The ConfigLoader instance.
+        :param manager: The ConfigManager instance.
         :param url: The URL to load.
         :return: The resultant Path instance.
         """
-        verify_type(config_loader, ConfigLoader)
+        verify_type(manager, ConfigManager)
         verify_type(url, str)
 
         if '://' not in url:
@@ -78,34 +82,34 @@ class FTPConnector(FSConnector):
         assert ':' not in user
 
         credential_string = user + '@' + server + '/ftp'
-        credential = config_loader.load_value(credential_string, credentials.Credential)
+        credential = manager.load_value(credential_string, credentials.Credential)
 
         return Path(path, cls(server + ':' + str(port), credential).connect())
 
     @classmethod
-    def load_config_section(cls, config_loader, section, *args, **kwargs):
+    def load_config_section(cls, manager, section, *args, **kwargs):
         """
         Load a new instance from a config section on behalf of a config loader.
 
-        :param config_loader: An attila.configurations.ConfigLoader instance.
+        :param manager: An attila.configurations.ConfigManager instance.
         :param section: The name of the section being loaded.
         :return: An instance of this type.
         """
-        verify_type(config_loader, ConfigLoader)
-        assert isinstance(config_loader, ConfigLoader)
+        verify_type(manager, ConfigManager)
+        assert isinstance(manager, ConfigManager)
 
         verify_type(section, str, non_empty=True)
 
-        server = config_loader.load_option(section, 'Server', str)
-        port = config_loader.load_option(section, 'Port', int, None)
-        passive = bool(config_loader.load_option(section, 'Passive', strtobool, False))
-        credential = config_loader.load_section(section, credentials.Credential)
+        server = manager.load_option(section, 'Server', str)
+        port = manager.load_option(section, 'Port', int, None)
+        passive = bool(manager.load_option(section, 'Passive', strtobool, False))
+        credential = manager.load_section(section, credentials.Credential)
 
         if port is not None:
             server = server + ':' + str(port)
 
         return super().load_config_section(
-            config_loader,
+            manager,
             section,
             *args,
             server=server,
@@ -166,6 +170,7 @@ class FTPConnector(FSConnector):
 
 
 # noinspection PyPep8Naming
+@config_loader
 class ftp_connection(fs_connection):
     """
     An ftp_connection manages the state for a new_instance to an FTP server, providing a

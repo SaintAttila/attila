@@ -23,11 +23,13 @@ from ..abc.files import Path
 from ..abc.notifications import Notifier
 
 from ..strings import split_port, to_list_of_strings
-from ..configurations import ConfigLoader, get_automation_config_loader
+from ..configurations import ConfigManager, get_automation_config_manager
 from ..context import get_entry_point_name
 from ..exceptions import verify_type, OperationNotSupportedError
+from ..plugins import config_loader
 
 
+__author__ = 'Aaron Hosford'
 __all__ = [
     'validate_email_address',
     'is_valid_email_address',
@@ -42,6 +44,7 @@ __all__ = [
 DEFAULT_EMAIL_PORT = 25
 
 
+@config_loader('EmailAddress')
 def validate_email_address(address):
     """
     Validate an email address. If it is malformed, raise an exception.
@@ -173,7 +176,7 @@ def get_standard_footer():
 
     # Try to load the add_footer template from the automation config.
     # If it can't be found, just use the default provided above.
-    config = get_automation_config_loader()
+    config = get_automation_config_manager()
     if 'Email' in config:
         section = config['Email']
         if 'Standard Footer' in section:
@@ -186,6 +189,7 @@ def get_standard_footer():
     return template.format(system=system, account=account, server=server, timestamp=timestamp)
 
 
+@config_loader('EmailAddressList')
 def to_email_address_set(value):
     """
     Parse an email address list string.
@@ -197,6 +201,7 @@ def to_email_address_set(value):
     return set(to_list_of_strings(value, normalizer=validate_email_address))
 
 
+@config_loader
 class EmailConnector(Connector, Configurable):
     """
     A channel for sending emails. An email channel keeps track of the server and email addresses, as
@@ -204,11 +209,11 @@ class EmailConnector(Connector, Configurable):
     """
 
     @classmethod
-    def load_config_value(cls, config_loader, value, *args, **kwargs):
+    def load_config_value(cls, manager, value, *args, **kwargs):
         """
         Load a class instance from the value of a config option.
 
-        :param config_loader: A ConfigLoader instance.
+        :param manager: A ConfigManager instance.
         :param value: The string value of the option.
         :return: A new instance of this class.
         """
@@ -217,25 +222,25 @@ class EmailConnector(Connector, Configurable):
         raise OperationNotSupportedError()
 
     @classmethod
-    def load_config_section(cls, config_loader, section, *args, **kwargs):
+    def load_config_section(cls, manager, section, *args, **kwargs):
         """
         Load a class instance from a config section.
 
-        :param config_loader: A ConfigLoader instance.
+        :param manager: A ConfigManager instance.
         :param section: The name of the section.
         :return: A new instance of this class.
         """
-        verify_type(config_loader, ConfigLoader)
-        assert isinstance(config_loader, ConfigLoader)
+        verify_type(manager, ConfigManager)
+        assert isinstance(manager, ConfigManager)
         verify_type(section, str, non_empty=True)
 
-        server = config_loader.load_option(section, 'SMTP Server', str)
-        port = config_loader.load_option(section, 'Port', int, None)
-        sender = config_loader.load_option(section, 'From', validate_email_address)
-        to = config_loader.load_option(section, 'To', to_email_address_set, None)
-        cc = config_loader.load_option(section, 'CC', to_email_address_set, None)
-        bcc = config_loader.load_option(section, 'BCC', to_email_address_set, None)
-        html = config_loader.load_option(section, 'HTML Content', strtobool, False)
+        server = manager.load_option(section, 'SMTP Server', str)
+        port = manager.load_option(section, 'Port', int, None)
+        sender = manager.load_option(section, 'From', validate_email_address)
+        to = manager.load_option(section, 'To', to_email_address_set, None)
+        cc = manager.load_option(section, 'CC', to_email_address_set, None)
+        bcc = manager.load_option(section, 'BCC', to_email_address_set, None)
+        html = manager.load_option(section, 'HTML Content', strtobool, False)
 
         if port is not None:
             server += ':' + str(port)
@@ -325,6 +330,7 @@ class EmailConnector(Connector, Configurable):
         )
 
 
+@config_loader
 class EmailNotifier(connection, Notifier, Configurable):
     """
     An email notifier acts as a template for email notifications, formatting the objects it is given
@@ -333,11 +339,11 @@ class EmailNotifier(connection, Notifier, Configurable):
     """
 
     @classmethod
-    def load_config_value(cls, config_loader, value, *args, **kwargs):
+    def load_config_value(cls, manager, value, *args, **kwargs):
         """
         Load a class instance from the value of a config option.
 
-        :param config_loader: A ConfigLoader instance.
+        :param manager: A ConfigManager instance.
         :param value: The string value of the option.
         :return: A new instance of this class.
         """
@@ -345,34 +351,34 @@ class EmailNotifier(connection, Notifier, Configurable):
         raise OperationNotSupportedError()
 
     @classmethod
-    def load_config_section(cls, config_loader, section, *args, **kwargs):
+    def load_config_section(cls, manager, section, *args, **kwargs):
         """
         Load a class instance from a config section.
 
-        :param config_loader: A ConfigLoader instance.
+        :param manager: A ConfigManager instance.
         :param section: The name of the section.
         :return: A new instance of this class.
         """
-        verify_type(config_loader, ConfigLoader)
-        assert isinstance(config_loader, ConfigLoader)
+        verify_type(manager, ConfigManager)
+        assert isinstance(manager, ConfigManager)
         verify_type(section, str, non_empty=True)
 
         # First try to load the connector as an option. Then, failing that, try to load this section
         # as a connector.
-        connector = config_loader.load_option(section, 'Connector', default=None)
+        connector = manager.load_option(section, 'Connector', default=None)
         if connector is None:
-            connector = EmailConnector.load_config_section(config_loader, section)
+            connector = EmailConnector.load_config_section(manager, section)
 
-        subject_template = config_loader.load_option(section, 'Subject', str)
+        subject_template = manager.load_option(section, 'Subject', str)
 
-        body_template = config_loader.load_option(section, 'Body', str, default=None)
+        body_template = manager.load_option(section, 'Body', str, default=None)
         if body_template is None:
-            body_template_path = config_loader.load_option(section, 'Body Path', Path)
+            body_template_path = manager.load_option(section, 'Body Path', Path)
             assert isinstance(body_template_path, Path)
             with body_template_path.open() as body_file:
                 body_template = body_file.read()
 
-        add_footer = config_loader.load_option(section, 'Add Footer', strtobool, True)
+        add_footer = manager.load_option(section, 'Add Footer', strtobool, True)
 
         return cls(
             *args,

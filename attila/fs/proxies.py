@@ -5,9 +5,16 @@ attila.fs.proxies
 Temporary proxy files
 """
 
+
 from ..abc.files import Path
 from .local import local_fs_connection
 from .temp import TempFile
+
+
+__author__ = 'Aaron Hosford'
+__all__ = [
+    'ProxyFile'
+]
 
 
 class ProxyFile(TempFile):

@@ -9,6 +9,7 @@ Interface definition for notifiers.
 from abc import ABCMeta, abstractmethod
 
 
+__author__ = 'Aaron Hosford'
 __all__ = [
     'Notifier',
 ]

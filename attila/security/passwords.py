@@ -22,11 +22,24 @@ import cryptography.fernet
 from ..abc.connections import Connector
 from ..abc.files import Path
 from ..exceptions import BadPasswordError, PasswordRequiredError
-
 from .. import configurations
-
-
 from . import encryption
+
+
+__author__ = 'Aaron Hosford'
+__all__ = [
+    'get_master_password_path',
+    'get_password_database_connector',
+    'set_master_password',
+    'get_master_password',
+    'get_domains',
+    'get_users',
+    'set_password',
+    'get_password',
+    'invalidate_password',
+    'remove_user',
+    'main',
+]
 
 
 def get_master_password_path():
@@ -36,12 +49,12 @@ def get_master_password_path():
     :return: The master password file path.
     """
 
-    auto_config = configurations.get_automation_config_loader()
+    auto_config = configurations.get_automation_config_manager()
     result = auto_config.load_option('Security', 'Password Data Path', Path, default=None)
     if result is not None:
         return result
 
-    attila_config = configurations.get_attila_config_loader()
+    attila_config = configurations.get_attila_config_manager()
     return attila_config.load_option('Security', 'Password Data Path', Path)
 
 
@@ -52,7 +65,7 @@ def get_password_database_connector():
     :return: The connector for the password database.
     :rtype: attila.abc.connections.Connector
     """
-    config_loader = configurations.get_automation_config_loader()
+    config_loader = configurations.get_automation_config_manager()
     connector = config_loader.load_option('Security', 'Password Database Connector')
     assert isinstance(connector, Connector)
     return connector

@@ -5,11 +5,13 @@ attila.security.encryption
 Standardized encryption routines.
 """
 
+
 import base64
 import ctypes
 import ctypes.wintypes
 import hashlib
 import os
+
 
 # For documentation on the cryptography library, or to download it, visit:
 #   https://cryptography.io/en/latest/
@@ -26,6 +28,18 @@ from ..exceptions import EncryptionError, DecryptionError
 kernel32 = ctypes.windll.kernel32
 msvcrt = ctypes.cdll.msvcrt
 crypt32 = ctypes.windll.crypt32
+
+
+__author__ = 'Aaron Hosford'
+__all__ = [
+    'to_bytes',
+    'from_bytes',
+    'get_encryption_key',
+    'locally_encrypt',
+    'locally_decrypt',
+    'encrypt',
+    'decrypt',
+]
 
 
 # See these URLs for information on the CRYPTPROTECT_* constants and the

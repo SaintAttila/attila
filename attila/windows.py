@@ -21,6 +21,14 @@ from .strings import glob_to_regex
 from .threads import wait_for_handle
 
 
+__author__ = 'Aaron Hosford'
+__all__ = [
+    'set_title',
+    'window_exists',
+    'force_close_windows',
+]
+
+
 log = logging.getLogger(__name__)
 
 
@@ -54,9 +62,10 @@ def window_exists(title):
 
 def _force_close_window_callback(hwnd, title_regex):
     """
-    Passed to win32gui.EnumWindows by force_close_window() to handle the closing of each individual window. If the title
-    regex isn't matched, the window is ignored. If it matches, we successively try various methods to politely get the
-    window to close. If none of them work, we resort to killing the process family.
+    Passed to win32gui.EnumWindows by force_close_window() to handle the closing of each individual
+    window. If the title regex isn't matched, the window is ignored. If it matches, we successively
+    try various methods to politely get the window to close. If none of them work, we resort to
+    killing the process family.
 
     :param hwnd: The window handle being examined.
     :param title_regex: The regex the title of the window is supposed to be matched by.
@@ -114,7 +123,8 @@ def force_close_windows(title_pattern):
     """
     Force-close all windows with a title matching the provided pattern.
 
-    :param title_pattern: A regex or a glob-style pattern string indicating which windows to force-close.
+    :param title_pattern: A regex or a glob-style pattern string indicating which windows to force-
+        close.
     :return: None
     """
     log.debug("Force-closing window(s) with title matching '%s'.", title_pattern)

@@ -15,6 +15,7 @@ from . import sql
 from . import transactions
 
 
+__author__ = 'Aaron Hosford'
 __all__ = [
     "configurations",
     "connections",

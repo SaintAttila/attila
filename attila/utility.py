@@ -13,6 +13,19 @@ import time
 from .exceptions import TooFewItemsError, TooManyItemsError
 
 
+__author__ = 'Aaron Hosford'
+__all__ = [
+    'first',
+    'last',
+    'only',
+    'distinct',
+    'wait_for',
+    'retry',
+    'wait_for_keypress',
+    'once',
+]
+
+
 def first(items):
     """
     Return the first item from a sequence. If the item sequence does not contain at least one value,
@@ -101,7 +114,8 @@ def wait_for(condition, timeout=None, attempts=None, interval=None, raise_error=
     """
     Wait for the specified condition to be satisfied.
 
-    :param condition: A callable (function, method, or lambda) which is called repeatedly.
+    :param condition: A callable (function, method, or lambda) which is called repeatedly and
+        returns a bool.
     :param timeout: The maximum number of seconds to wait before giving up.
     :param attempts: The maximum number of attempts to make before giving up.
     :param interval: The number of seconds to wait between attempts. Default is 1.

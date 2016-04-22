@@ -8,9 +8,11 @@ Interface definition for transactional connections.
 
 from abc import ABCMeta, abstractmethod
 
+
 from . import connections
 
 
+__author__ = 'Aaron Hosford'
 __all__ = [
     "transactional_connection",
 ]

@@ -10,6 +10,12 @@ import datetime
 import logging
 
 
+__author__ = 'Aaron Hosford'
+__all__ = [
+    'progress',
+]
+
+
 log = logging.getLogger(__name__)
 
 

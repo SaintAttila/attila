@@ -11,10 +11,16 @@ import win32con
 import win32security
 
 
-from ..configurations import get_automation_config_loader
+from ..configurations import get_automation_config_manager
 from ..exceptions import verify_type
 
 from .credentials import Credential
+
+
+__author__ = 'Aaron Hosford'
+__all__ = [
+    'impersonation',
+]
 
 
 class impersonation:
@@ -51,7 +57,7 @@ class impersonation:
         """
 
         if credential is None:
-            config_loader = get_automation_config_loader()
+            config_loader = get_automation_config_manager()
             credential = \
                 config_loader.load_option('Security', 'Default Login Credential', Credential)
 
@@ -70,7 +76,7 @@ class impersonation:
         self.handle = None
 
         if credential is None:
-            config_loader = get_automation_config_loader()
+            config_loader = get_automation_config_manager()
             credential = \
                 config_loader.load_option('Security', 'Default Login Credential', Credential)
 

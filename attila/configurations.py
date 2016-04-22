@@ -15,21 +15,19 @@ import threading
 
 from .abc import files
 from .exceptions import verify_type, verify_callable
-
-from . import plugins
+from .plugins import URL_SCHEMES, CONFIG_LOADERS, config_loader
 
 
 __author__ = 'Aaron Hosford'
-
 __all__ = [
     "load_global_value",
     "load_global_function",
     "get_default_config_search_dirs",
     "iter_config_search_paths",
     "load_config",
-    "ConfigLoader",
-    "get_attila_config_loader",
-    "get_automation_config_loader",
+    "ConfigManager",
+    "get_attila_config_manager",
+    "get_automation_config_manager",
 ]
 
 
@@ -40,14 +38,13 @@ _CONFIG_EXTENSIONS = (
     '',
 )
 
-_ATTILA_CONFIG_LOADER = None
-_AUTOMATION_CONFIG_LOADER = None
+_ATTILA_CONFIG_MANAGER = None
+_AUTOMATION_CONFIG_MANAGER = None
 
 _GLOBALS_LOCK = threading.RLock()
 
 
-# TODO: Add load_global_value() and load_global_function() as entry points in the
-#       attila.config_loaders group.
+@config_loader
 def load_global_value(name):
     """
     Safely convert a globally defined Python dotted name to the Python value it represents.
@@ -76,6 +73,7 @@ def load_global_value(name):
     return eval(name, global_symbols, local_symbols)
 
 
+@config_loader
 def load_global_function(name):
     """
     Safely convert a globally defined Python dotted name to the Python function it represents.
@@ -101,7 +99,7 @@ def get_default_config_search_dirs(file_name_base=None):
         config_location = None
     else:
         # Careful with this recursion... We don't want an infinite loop.
-        attila_config_loader = get_attila_config_loader()
+        attila_config_loader = get_attila_config_manager()
         option_name = file_name_base.title() + ' Config'
         config_location = attila_config_loader.load_option('DEFAULT', option_name, str,
                                                            default=None)
@@ -175,9 +173,9 @@ def load_config(file_name_base, dirs=None, extensions=None, error=False):
     return config
 
 
-class ConfigLoader:
+class ConfigManager:
     """
-    A ConfigLoader provides the ability to load compound objects from a configuration file.
+    A ConfigManager manages the loading of compound objects directly from a configuration file.
     """
 
     def __init__(self, config, loaders=None, url_schemes=None, fallbacks=None):
@@ -197,11 +195,11 @@ class ConfigLoader:
 
         fallbacks = tuple(fallbacks or ())
         for fallback in fallbacks:
-            verify_type(fallback, ConfigLoader)
+            verify_type(fallback, ConfigManager)
 
         self._config = config
-        self._loaders = plugins.CONFIG_LOADERS if loaders is None else loaders
-        self._url_schemes = plugins.URL_SCHEMES if url_schemes is None else url_schemes
+        self._loaders = CONFIG_LOADERS if loaders is None else loaders
+        self._url_schemes = URL_SCHEMES if url_schemes is None else url_schemes
         self._loaded_instances = {}
         self._fallbacks = fallbacks
         self._lock = threading.RLock()
@@ -221,6 +219,16 @@ class ConfigLoader:
     def fallbacks(self):
         """The other ConfigLoaders that are used for default values when none is provided."""
         return self._fallbacks
+
+    def add_loader(self, name, loader):
+        """
+        Add a new config loader.
+
+        :param name: The name of the new loader.
+        :param loader: The loader.
+        """
+        with self._lock:
+            self._loaders[name] = loader
 
     def has_option(self, section, option):
         """
@@ -333,7 +341,7 @@ class ConfigLoader:
 
         if not self._config.has_option(section, option):
             for fallback in self._fallbacks:
-                assert isinstance(fallback, ConfigLoader)
+                assert isinstance(fallback, ConfigManager)
                 if fallback.has_option(section, option):
                     return fallback.load_option(section, option, loader)
             if default is not NotImplemented:
@@ -388,7 +396,7 @@ class ConfigLoader:
 
         if not self._config.has_section(section):
             for fallback in self._fallbacks:
-                assert isinstance(fallback, ConfigLoader)
+                assert isinstance(fallback, ConfigManager)
                 if fallback.has_section(section):
                     return fallback.load_section(section, loader)
             if default is not NotImplemented:
@@ -449,40 +457,40 @@ class ConfigLoader:
             return self.load_option(section, option, loader, default)
 
 
-def get_attila_config_loader(error=False, refresh=False):
+def get_attila_config_manager(error=False, refresh=False):
     """
-    Get the configuration loader for the attila package. This is specifically configuring the
+    Get the configuration manager for the attila package. This is specifically configuring the
     behavior of attila itself, not for controlling the automations implemented on top of it. If you
     are looking for the global configuration settings shared among all automations, use
-    get_automation_config_loader() instead.
+    get_automation_config_manager() instead.
 
     :param error: Whether to raise exceptions when the parser cannot read a config file.
     :param refresh: Whether to reload the configuration information from disk.
-    :return: A ConfigLoader instance which can be used to load the attila-specific config settings.
+    :return: A ConfigManager instance which can be used to load the attila-specific config settings.
     """
     with _GLOBALS_LOCK:
-        global _ATTILA_CONFIG_LOADER
-        if refresh or _ATTILA_CONFIG_LOADER is None:
+        global _ATTILA_CONFIG_MANAGER
+        if refresh or _ATTILA_CONFIG_MANAGER is None:
             config = load_config('attila', error=error)
-            _ATTILA_CONFIG_LOADER = ConfigLoader(config)
-        assert isinstance(_ATTILA_CONFIG_LOADER, ConfigLoader)
-        return _ATTILA_CONFIG_LOADER
+            _ATTILA_CONFIG_MANAGER = ConfigManager(config)
+        assert isinstance(_ATTILA_CONFIG_MANAGER, ConfigManager)
+        return _ATTILA_CONFIG_MANAGER
 
 
-def get_automation_config_loader(error=False, refresh=False):
+def get_automation_config_manager(error=False, refresh=False):
     """
-    Get the configuration loader for settings shared among all automations. This is distinct from
-    the attila config loader, which configures the behavior of attila itself.
+    Get the configuration manager for settings shared among all automations. This is distinct from
+    the attila config manager, which configures the behavior of attila itself.
 
     :param error: Whether to raise exceptions when the parser cannot read a config file.
     :param refresh: Whether to reload the configuration information from disk.
-    :return: A ConfigLoader instance which can be used to load the globally shared automation config
-        settings.
+    :return: A ConfigManager instance which can be used to load the globally shared automation
+        config settings.
     """
     with _GLOBALS_LOCK:
-        global _AUTOMATION_CONFIG_LOADER
-        if refresh or _AUTOMATION_CONFIG_LOADER is None:
+        global _AUTOMATION_CONFIG_MANAGER
+        if refresh or _AUTOMATION_CONFIG_MANAGER is None:
             config = load_config('automation', error=error)
-            _AUTOMATION_CONFIG_LOADER = ConfigLoader(config)
-        assert isinstance(_AUTOMATION_CONFIG_LOADER, ConfigLoader)
-        return _AUTOMATION_CONFIG_LOADER
+            _AUTOMATION_CONFIG_MANAGER = ConfigManager(config)
+        assert isinstance(_AUTOMATION_CONFIG_MANAGER, ConfigManager)
+        return _AUTOMATION_CONFIG_MANAGER

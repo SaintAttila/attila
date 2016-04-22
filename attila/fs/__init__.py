@@ -15,6 +15,7 @@ from . import temp
 from ..abc.files import Path
 from .local import local_fs_connection
 
+__author__ = 'Aaron Hosford'
 __all__ = [
     'ftp',
     'http',

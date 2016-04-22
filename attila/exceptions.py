@@ -6,6 +6,47 @@ Exception definitions for attila.
 """
 
 
+__author__ = 'Aaron Hosford'
+__all__ = [
+    'AttilaException',
+    'ConfigurationError',
+    'InvalidConfigurationError',
+    'ConfigSectionNotFoundError',
+    'ConfigParameterNotFoundError',
+    'ObjectNotConfiguredError',
+    'ObjectNotReconfigurableError',
+    'NoConfigurableInstanceTypeError',
+    'PathError',
+    'DirectoryNotEmptyError',
+    'InvalidPathError',
+    'NoDefaultFSConnectionError',
+    'SecurityError',
+    'CryptographyError',
+    'EncryptionError',
+    'DecryptionError',
+    'PasswordError',
+    'PasswordRequiredError',
+    'BadPasswordError',
+    'PluginError',
+    'PluginExistsError',
+    'InvalidPluginError',
+    'PluginNotFoundError',
+    'OperationNotSupportedError',
+    'ConnectionStatusError',
+    'ConnectionOpenError',
+    'ConnectionNotOpenError',
+    'ConnectionReopenError',
+    'PropertyError',
+    'PropertyAlreadySetError',
+    'PropertyNotSetError',
+    'ItemCountError',
+    'TooFewItemsError',
+    'TooManyItemsError',
+    'verify_type',
+    'verify_callable',
+]
+
+
 class AttilaException(Exception):
     """Base class for all exceptions defined by attila."""
 

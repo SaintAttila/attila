@@ -8,11 +8,12 @@ Interface definition for SQL connections.
 
 from abc import ABCMeta, abstractmethod
 
-from . import rpc
 
+from . import rpc
 from ..exceptions import OperationNotSupportedError
 
 
+__author__ = 'Aaron Hosford'
 __all__ = [
     "RecordSet",
     "sql_connection",

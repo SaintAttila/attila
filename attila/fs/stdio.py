@@ -11,33 +11,37 @@ import sys
 from urllib.parse import urlparse
 
 from ..abc.files import Path, FSConnector, fs_connection
-from ..configurations import ConfigLoader
+from ..configurations import ConfigManager
 from ..exceptions import verify_type
+from ..plugins import config_loader, url_scheme
 
 
+__author__ = 'Aaron Hosford'
 __all__ = [
     'STDIOFSConnector',
     'stdio_fs_connection',
 ]
 
 
+@config_loader
+@url_scheme('stdio')  # This is not a standard URL scheme
 class STDIOFSConnector(FSConnector):
     """
     Stores the STDIO files system new_instance information.
     """
 
     @classmethod
-    def load_url(cls, config_loader, url):
+    def load_url(cls, manager, url):
         """
         Load a new Path instance from a URL string.
 
         There is no standard format for a stdio URL. We use "stdio://stream_name"
 
-        :param config_loader: The ConfigLoader instance.
+        :param manager: The ConfigManager instance.
         :param url: The URL to load.
         :return: The resultant Path instance.
         """
-        verify_type(config_loader, ConfigLoader)
+        verify_type(manager, ConfigManager)
         verify_type(url, str)
 
         if '://' not in url:
@@ -58,6 +62,7 @@ class STDIOFSConnector(FSConnector):
 
 
 # noinspection PyPep8Naming
+@config_loader
 class stdio_fs_connection(fs_connection):
     """
     stdio_fs_connection implements an interface for the STDIO file system, handling interactions
