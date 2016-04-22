@@ -1,3 +1,10 @@
+"""
+info.py
+=======
+
+Attila package information for use by setup.py and packaging utilities.
+"""
+
 import os
 import sys
 from importlib.machinery import SourceFileLoader

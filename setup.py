@@ -1,3 +1,10 @@
+"""
+setup.py
+========
+
+Setup script for attila package.
+"""
+
 import os
 from setuptools import setup
 
