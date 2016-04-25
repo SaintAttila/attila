@@ -186,7 +186,8 @@ class ADODBConnector(connections.Connector, configurations.Configurable):
 
         if user is not None:
             credential_string = user + '@' + server + '/adodb'
-            credential = manager.load_value(credential_string, credentials.Credential)
+            credential = \
+                manager.load_value(credential_string, credentials.Credential)
         else:
             credential = None
 
@@ -219,10 +220,12 @@ class ADODBConnector(connections.Connector, configurations.Configurable):
         driver = manager.load_option(section, 'Driver', str, default=None)
         trusted = manager.load_option(section, 'Trusted', str, default=None)
 
-        credential = manager.load_option(section, 'Credential', credentials.Credential,
+        credential = manager.load_option(section, 'Credential',
+                                         credentials.Credential,
                                          default=None)
         if credential is None:
-            credential = manager.load_section(section, loader=credentials.Credential,
+            credential = manager.load_section(section,
+                                              loader=credentials.Credential,
                                               default=None)
 
         return cls(

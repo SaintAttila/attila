@@ -69,7 +69,7 @@ class PluginGroup(Mapping):
         if self._value_type is not None and not isinstance(value, self._value_type):
             raise InvalidPluginError("Plugin %s is not a/an %s." %
                                      (name, self._value_type.__name__))
-        self._original_names[name.lower()] = name
+        self._original_names[name] = name
         self._registry[name.lower()] = value
 
     def __getitem__(self, name):
@@ -85,7 +85,7 @@ class PluginGroup(Mapping):
         self.register(name, value)
 
     def __iter__(self):
-        return self._original_names.values()
+        return iter(self._original_names)
 
     def __contains__(self, name):
         if not isinstance(name, str):

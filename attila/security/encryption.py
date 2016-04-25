@@ -16,7 +16,6 @@ import os
 #   pip install cryptography
 import cryptography.fernet
 
-from .. import security
 from ..exceptions import EncryptionError, DecryptionError
 
 

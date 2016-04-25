@@ -28,10 +28,7 @@ Windows login account.
 """
 
 
+from . import credentials, encryption, passwords
+
+
 __author__ = 'Aaron Hosford'
-__all__ = [
-    'credentials',
-    'encryption',
-    'impersonation',
-    'passwords',
-]

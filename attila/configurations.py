@@ -10,7 +10,9 @@ import os
 import threading
 
 
-from . import abc
+# This has to be imported like this to avoid an import cycle.
+import attila.abc.files
+
 from .exceptions import verify_type, verify_callable
 from .plugins import URL_SCHEMES, CONFIG_LOADERS, config_loader
 
@@ -183,7 +185,7 @@ class ConfigManager:
                 config.read(path)
             else:
                 config = load_config(file_name_base=config)
-        elif isinstance(config, abc.files.Path):
+        elif isinstance(config, attila.abc.files.Path):
             path = config
             config = configparser.ConfigParser()
             with path.open() as file:
@@ -307,7 +309,7 @@ class ConfigManager:
         else:
             path = scheme_loader(url)
 
-        assert isinstance(path, abc.files.Path)
+        assert isinstance(path, attila.abc.files.Path)
         return path
 
     def load_option(self, section, option, loader=None, default=NotImplemented):
