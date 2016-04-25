@@ -1,7 +1,4 @@
 """
-attila.notifications.callbacks
-==============================
-
 Bindings for sending notifications to Python callbacks.
 """
 

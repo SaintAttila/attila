@@ -1,7 +1,4 @@
 """
-attila.fs.local
-===============
-
 Local file system support
 """
 

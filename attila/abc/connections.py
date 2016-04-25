@@ -1,7 +1,4 @@
 """
-attila.abc.connections
-======================
-
 Interface definition for connectors and connections.
 """
 

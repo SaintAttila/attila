@@ -1,7 +1,4 @@
 """
-attila.windows
-==============
-
 Functions for dealing with windows.
 """
 

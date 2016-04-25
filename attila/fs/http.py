@@ -1,7 +1,4 @@
 """
-attila.fs.http
-==============
-
 HTTP file system support
 """
 

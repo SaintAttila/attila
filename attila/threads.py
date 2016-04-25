@@ -1,7 +1,4 @@
 """
-attila.threads
-==============
-
 Classes and functions for multi-threaded environments and inter-thread/process synchronization and
 communication.
 """

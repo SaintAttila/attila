@@ -1,7 +1,4 @@
 """
-attila.abc.files
-================
-
 Interface definition for paths, file system connectors, and file system connections.
 """
 

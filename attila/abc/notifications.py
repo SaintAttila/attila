@@ -1,7 +1,4 @@
 """
-attila.abc.notifications
-========================
-
 Interface definition for notifiers.
 """
 

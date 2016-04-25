@@ -1,7 +1,4 @@
 """
-attila.strings
-==============
-
 String parsing, formatting, and matching routines.
 """
 

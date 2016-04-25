@@ -1,7 +1,4 @@
 """
-attila.notifications.null
-=========================
-
 Bindings for silently dropping notifications.
 """
 

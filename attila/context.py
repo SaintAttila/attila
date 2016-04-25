@@ -1,7 +1,4 @@
 """
-attila.env
-==========
-
 A standardized automation environment
 """
 
@@ -57,10 +54,10 @@ class task:
     Use with the 'with' statement to automatically track what task is being performed.
 
     Example Usage:
-        with task("Doing stuff...") as root_task:
+        with task("Doing stuff..."):
             print("Now I'm doing stuff.")
 
-            with task("Doing more detailed stuff...") as subtask:
+            with task("Doing more detailed stuff..."):
                 print("This is getting complicated.")
 
     If and when an error occurs, the nested tasks that were failed will automatically generate

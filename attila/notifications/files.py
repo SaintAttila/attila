@@ -1,7 +1,4 @@
 """
-attila.notifications.files
-==========================
-
 Bindings for sending notifications to file objects.
 """
 

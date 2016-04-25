@@ -1,7 +1,4 @@
 """
-attila.notifications.logs
-=========================
-
 Bindings for sending notifications to Python logger objects.
 """
 

@@ -1,7 +1,4 @@
 """
-attila.progress
-===============
-
 Progress tracking and completion estimation.
 """
 

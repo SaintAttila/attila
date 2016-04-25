@@ -1,7 +1,4 @@
 """
-attila.db.sqlite
-================
-
 SQLite database interface for Python
 """
 

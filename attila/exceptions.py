@@ -1,7 +1,4 @@
 """
-attila.exceptions
-=================
-
 Exception definitions for attila.
 """
 

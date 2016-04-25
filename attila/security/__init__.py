@@ -1,7 +1,4 @@
 """
-attila.security
-===============
-
 Security- and credential-related functionality.
 
 The security chain, summarized in one sentence:
@@ -29,12 +26,6 @@ than the local encryption mechanism that is used for the master password; as
 long as you use the right password, you can use this from any machine with any
 Windows login account.
 """
-
-
-from . import credentials
-from . import encryption
-from . import impersonation
-from . import passwords
 
 
 __author__ = 'Aaron Hosford'

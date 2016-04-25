@@ -1,7 +1,4 @@
 """
-attila.processes
-================
-
 Tools for controlling and interacting with Windows processes.
 """
 

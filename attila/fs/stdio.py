@@ -1,7 +1,4 @@
 """
-attila.fs.stdio
-===============
-
 STDIN/STDOUT/STDERR file system support
 """
 

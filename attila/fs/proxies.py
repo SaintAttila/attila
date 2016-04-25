@@ -1,7 +1,4 @@
 """
-attila.fs.proxies
-=================
-
 Temporary proxy files
 """
 

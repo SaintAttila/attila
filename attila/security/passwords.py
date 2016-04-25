@@ -1,7 +1,4 @@
 """
-attila.security.passwords
-=========================
-
 Password storage and retrieval.
 """
 

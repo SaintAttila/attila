@@ -1,7 +1,4 @@
 """
-attila.security.credentials
-===========================
-
 Implements the Credential class, for password-based login credentials.
 """
 

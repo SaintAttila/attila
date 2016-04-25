@@ -1,7 +1,4 @@
 """
-attila.abc.configurables
-========================
-
 Interface definition for configurable objects.
 """
 

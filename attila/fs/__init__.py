@@ -1,16 +1,7 @@
 """
-attila.fs
-=========
-
 File system-related functionality
 """
 
-
-from . import ftp
-from . import http
-from . import local
-from . import proxies
-from . import temp
 
 from ..abc.files import Path
 from .local import local_fs_connection

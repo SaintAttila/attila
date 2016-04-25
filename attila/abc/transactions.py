@@ -1,7 +1,4 @@
 """
-attila.abc.transactions
-=======================
-
 Interface definition for transactional connections.
 """
 

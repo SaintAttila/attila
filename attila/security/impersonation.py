@@ -1,7 +1,4 @@
 """
-attila.security.impersonation
-=============================
-
 Implements the impersonation class for temporarily or semi-permanently logging in with different
 credentials.
 """

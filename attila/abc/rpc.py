@@ -1,7 +1,4 @@
 """
-attila.abc.rpc
-==============
-
 Interface definition for remote procedure call server connections.
 """
 

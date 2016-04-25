@@ -1,7 +1,4 @@
 """
-attila.fs.temp
-==============
-
 Temporary files with automatic cleanup
 """
 

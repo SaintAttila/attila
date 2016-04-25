@@ -1,7 +1,4 @@
 """
-attila.ftp
-==========
-
 FTP file system support
 """
 
@@ -24,7 +21,6 @@ from ..exceptions import verify_type
 from ..plugins import config_loader, url_scheme
 from ..security import credentials
 from .proxies import ProxyFile
-
 
 
 __author__ = 'Aaron Hosford'

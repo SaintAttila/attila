@@ -9,6 +9,7 @@ bak/
 
 # Project-specific stuff:
 .idea/
+doc/sphynx/
 
 ## File-based project format:
 *.iws

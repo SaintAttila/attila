@@ -1,7 +1,4 @@
 """
-attila.security.encryption
-==========================
-
 Standardized encryption routines.
 """
 
@@ -19,7 +16,7 @@ import os
 #   pip install cryptography
 import cryptography.fernet
 
-from . import passwords
+from .. import security
 from ..exceptions import EncryptionError, DecryptionError
 
 
@@ -284,7 +281,7 @@ def encrypt(data, password=None):
     :return: The encrypted data.
     """
 
-    key = get_encryption_key(password or passwords.get_master_password())
+    key = get_encryption_key(password or security.passwords.get_master_password())
     del password
     symmetric_encoding = cryptography.fernet.Fernet(key)
     del key
@@ -304,7 +301,7 @@ def decrypt(data, password=None):
     :return: The decrypted data.
     """
 
-    key = get_encryption_key(password or passwords.get_master_password())
+    key = get_encryption_key(password or security.passwords.get_master_password())
     del password
     symmetric_encoding = cryptography.fernet.Fernet(key)
     del key

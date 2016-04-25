@@ -1,7 +1,4 @@
 """
-attila.utility
-==============
-
 Utility functions. This module is the "miscellaneous bin", providing a home for simple functions and
 classes that don't really belong anywhere else.
 """

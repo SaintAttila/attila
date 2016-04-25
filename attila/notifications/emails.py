@@ -1,7 +1,4 @@
 """
-attila.notifications.emails
-===========================
-
 Bindings for sending email notifications.
 """
 

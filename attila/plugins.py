@@ -1,7 +1,4 @@
 """
-attila.plugins
-==============
-
 Infrastructure for dealing with plugins.
 """
 

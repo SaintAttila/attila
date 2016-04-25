@@ -1,7 +1,4 @@
 """
-attila.db.adodb
-===============
-
 ADODB database interface for Python
 """
 

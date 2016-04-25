@@ -1,7 +1,4 @@
 """
-attila.abc.sql
-==============
-
 Interface definition for SQL connections.
 """
 

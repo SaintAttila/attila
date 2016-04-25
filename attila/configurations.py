@@ -1,7 +1,4 @@
 """
-attila.configurations
-=====================
-
 Supports the automatic loading and configuration of compound objects directly from a configuration
 file.
 """
@@ -13,7 +10,7 @@ import os
 import threading
 
 
-from .abc import files
+from . import abc
 from .exceptions import verify_type, verify_callable
 from .plugins import URL_SCHEMES, CONFIG_LOADERS, config_loader
 
@@ -186,7 +183,7 @@ class ConfigManager:
                 config.read(path)
             else:
                 config = load_config(file_name_base=config)
-        elif isinstance(config, files.Path):
+        elif isinstance(config, abc.files.Path):
             path = config
             config = configparser.ConfigParser()
             with path.open() as file:
@@ -310,7 +307,7 @@ class ConfigManager:
         else:
             path = scheme_loader(url)
 
-        assert isinstance(path, files.Path)
+        assert isinstance(path, abc.files.Path)
         return path
 
     def load_option(self, section, option, loader=None, default=NotImplemented):
