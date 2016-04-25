@@ -110,12 +110,14 @@ class PluginGroup(Mapping):
         """
         A decorator for in-line registration of plugins.
 
-        Registering a plugin function under its own name to group PLUGIN_GROUP:
+        Registering a plugin function under its own name to group PLUGIN_GROUP::
+
             @PLUGIN_GROUP.plugin
             def aptly_named_plugin_function(arg1, arg2):
                 ...
 
-        Registering a plugin function to a different name to group PLUGIN_GROUP:
+        Registering a plugin function to a different name to group PLUGIN_GROUP::
+
             @PLUGIN_GROUP.plugin('BetterPluginName')
             def less_aptly_named_plugin_function(arg1, arg2):
                 ...
@@ -160,9 +162,7 @@ URL_SCHEMES = PluginGroup('attila.url_scheme')
 
 def load_plugins(warn=True):
     """
-    =============================================================================
-    Load Attila Plugins
-    =============================================================================
+    Load all registered Attila plugins.
 
     Another package can register a plugin for use by attila by setting the entry_points parameter in
     the other package's setup.py script. See http://stackoverflow.com/a/9615473/4683578 and/or
@@ -192,25 +192,32 @@ def config_loader(name=NotImplemented, value=NotImplemented):
     """
     A decorator for in-line registration of config loaders.
 
-    Registering a config loader function under its own name:
+    Registering a config loader function under its own name::
+
         @config_loader
         def aptly_named_config_loader(string):
             ...
 
-    Registering a config loader function under a different name:
+
+    Registering a config loader function under a different name::
+
         @config_loader('BetterConfigLoaderName')
         def less_aptly_named_config_loader(string):
             ...
 
-    Registering a config loader class under its own name:
+
+    Registering a config loader class under its own name::
+
         @config_loader
         class AptlyNamedConfigLoader(attila.abc.configurations.Configurable):
             ...
 
-    Registering a config loader class under a different name:
+    Registering a config loader class under a different name::
+
         @config_loader('BetterConfigLoaderName')
         class LessAptlyNamedConfigLoader(attila.abc.configurations.Configurable):
             ...
+
 
     :param name: The name to register the plugin under.
     :param value: The value to register as a plugin.
@@ -224,12 +231,14 @@ def url_scheme(name=NotImplemented, value=NotImplemented):
     """
     A decorator for in-line registration of URL schemes.
 
-    Registering a URL scheme function under its own name:
+    Registering a URL scheme function under its own name::
+
         @config_loader
         def aptly_named_url_scheme(string):
             ...
 
-    Registering a URL scheme function under a different name:
+    Registering a URL scheme function under a different name::
+
         @config_loader('BetterConfigLoaderName')
         def less_aptly_named_url_scheme(string):
             ...

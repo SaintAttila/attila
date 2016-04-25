@@ -650,7 +650,7 @@ class Path(Configurable):
         found, return None. If multiple files are found, either disambiguate by recency if
         most_recent is set, or raise an exception if most_recent is not set.
 
-        :param pattern: The pattern which the file must match. Default is '*" (all files).
+        :param pattern: The pattern which the file must match. Default is '*' (all files).
         :param most_recent: Whether to use recency to disambiguate when multiple files are matched
             by the pattern.
         :return: The uniquely identified file, as a Path instance, or None.
