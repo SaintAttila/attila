@@ -12,6 +12,23 @@ ADODB database interface for Python
 #       how complicated is it going to get?
 
 
+# TODO: Create a SQLQueryBuilder base class to allow queries to be built with identical code
+#       regardless of which type of database is being connected to. Something like this:
+#
+#           qb = connection.query_builder
+#           query = qb.select(
+#               'column_1',
+#               'column_2',
+#               column_3='extra_column'
+#           ).from_(
+#               'table_name'
+#           ).where(
+#               qb.column_1 < qb.column_2 &
+#               qb.column_2 == qb.column_3
+#           )
+#           results = query.execute()
+
+
 import win32com.client
 
 
