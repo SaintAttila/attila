@@ -23,25 +23,30 @@ __all__ = [
 ]
 
 
-def first(items):
+def first(items, default=NotImplemented):
     """
     Return the first item from a sequence. If the item sequence does not contain at least one value,
     raise an exception.
 
     :param items: The iterable sequence of items.
+    :param default: The value returned if there are no items.
     :return: The first item in the sequence.
     """
     for item in items:
         return item
-    raise TooFewItemsError("No items found in sequence.")
+    if default is NotImplemented:
+        raise TooFewItemsError("No items found in sequence.")
+    else:
+        return default
 
 
-def last(items):
+def last(items, default=NotImplemented):
     """
     Return the lst item from a sequence. If the item sequence does not contain at least one value,
     raise an exception.
 
     :param items: The iterable sequence of items.
+    :param default: The value returned if there are no items.
     :return: The last item in the sequence.
     """
     result = None
@@ -49,12 +54,15 @@ def last(items):
     for item in items:
         result = item
         found = True
-    if not found:
+    if found:
+        return result
+    elif default is NotImplemented:
         raise TooFewItemsError("No items found in sequence.")
-    return result
+    else:
+        return default
 
 
-def only(items, ignore_duplicates=False):
+def only(items, ignore_duplicates=False, default=NotImplemented):
     """
     Return the only item from a sequence. If the item sequence does not contain exactly one value,
     raise an exception. Among other scenarios, this is useful for verifying expected results in SQL
@@ -62,6 +70,7 @@ def only(items, ignore_duplicates=False):
 
     :param items: The iterable sequence of items.
     :param ignore_duplicates: Whether to ignore multiple occurrences of the same value.
+    :param default: The default value if there are no items.
     :return: The only item in the sequence.
     """
 
@@ -74,9 +83,12 @@ def only(items, ignore_duplicates=False):
         else:
             found = True
             result = item
-    if not found:
+    if found:
+        return result
+    elif default is NotImplemented:
         raise TooFewItemsError("No items found in sequence.")
-    return result
+    else:
+        return default
 
 
 def distinct(items, key=None):

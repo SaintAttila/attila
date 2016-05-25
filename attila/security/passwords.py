@@ -47,12 +47,12 @@ def get_master_password_path():
     """
 
     auto_config = configurations.get_automation_config_manager()
-    result = auto_config.load_option('Security', 'Password Data Path', Path, default=None)
+    result = auto_config.load_option('Security', 'Master Password Path', Path, default=None)
     if result is not None:
         return result
 
     attila_config = configurations.get_attila_config_manager()
-    return attila_config.load_option('Security', 'Password Data Path', Path)
+    return attila_config.load_option('Security', 'Master Password Path', Path)
 
 
 def get_password_database_connector():
@@ -63,7 +63,7 @@ def get_password_database_connector():
     :rtype: attila.abc.connections.Connector
     """
     config_loader = configurations.get_automation_config_manager()
-    connector = config_loader.load_option('Security', 'Password Database Connector')
+    connector = config_loader.load_option('Security', 'Password DB Connector')
     assert isinstance(connector, Connector)
     return connector
 
@@ -96,7 +96,7 @@ def set_master_password(password):
     :param password: The new master password.
     """
 
-    if not os.path.exists(get_master_password_path()):
+    if not get_master_password_path().exists:
         _set_master_password(password)
         return
 
@@ -143,17 +143,26 @@ def set_master_password(password):
         del password
 
 
-def get_master_password(refresh=True):
+def get_master_password(refresh=True, update=True):
     """
     Read and decrypt the master automation password. (Note that this is distinct from the password
     for the Windows automation login.) The password is returned as a unicode string. if refresh is
     set, first checks for a possible password update stored in the database.
 
     :param refresh: Whether to check the password database to see if the local cache is out of date.
+    :param update: Whether to ask the user to update if the password file is missing.
     :return: The master password.
     """
 
-    with get_master_password_path().open(mode='rb') as password_file:
+    path = get_master_password_path()
+    assert isinstance(path, Path)
+
+    if update and not path.exists:
+        update_master_password()
+
+    path.verify_is_file()
+
+    with path.open(mode='rb') as password_file:
         encrypted_password = password_file.read()
 
     password = encryption.from_bytes(encryption.locally_decrypt(encrypted_password))
@@ -277,7 +286,7 @@ def get_password(domain, user, refresh_master=True):
     # Query the DB for the username's password.
     with get_password_database_connector().connect() as connection:
         # noinspection SqlDialectInspection,SqlNoDataSourceInspection
-        results = connection.Execute(
+        results = connection.execute(
             "SELECT Password FROM AutomationPasswords WHERE System = '" +
             domain + "' AND UserName = '" + user + "' AND Valid = 1"
         )
@@ -285,7 +294,7 @@ def get_password(domain, user, refresh_master=True):
             encrypted_password = base64.b64decode(row[0])
             break
         else:
-            raise PasswordRequiredError("No valid password entry for this user name.")
+            raise PasswordRequiredError("No valid password entry for %s@%s." % (user, domain))
 
     # decrypt and remove salt & padding.
     # noinspection PyUnboundLocalVariable
@@ -332,21 +341,24 @@ def remove_user(domain, user):
         )
 
 
+def update_master_password():
+    """
+    Updates the master password.
+
+    :return:
+    """
+    password = getpass.getpass('Enter new master automation password: ')
+    if password != getpass.getpass('Re-enter new master automation password: '):
+        raise BadPasswordError("Passwords do not match.")
+    set_master_password(password)
+
+
 def main():
     """
     Updates the master password on the command line.
     """
 
-    password = None
-
-    try:
-        password = getpass.getpass('Enter new master automation password: ')
-        if password != getpass.getpass('Re-enter new master automation password: '):
-            raise BadPasswordError("Passwords do not match.")
-        set_master_password(password)
-    finally:
-        del password
-
+    update_master_password()
     print("Master automation password has been changed.")
 
 

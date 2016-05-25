@@ -8,7 +8,8 @@ import collections
 
 from ..abc.configurations import Configurable
 from ..abc.files import Path
-from ..configurations import ConfigManager
+from ..configurations import ConfigManager, INTERPOLATION_ESCAPE, INTERPOLATION_OPEN, \
+    INTERPOLATION_CLOSE
 from ..exceptions import verify_type
 from ..plugins import config_loader
 from . import encryption
@@ -67,23 +68,26 @@ class Credential(collections.namedtuple('Credential', 'user password domain'), C
         assert isinstance(manager, ConfigManager)
         verify_type(section, str, non_empty=True)
 
-        user = manager.load_option(section, 'User')
+        user = manager.load_option(section, 'user')
+        domain = manager.load_option(section, 'domain')
 
         # There are two options for getting a password: Load it from the password database, or from
         # a locally-encrypted password file. If it's from the database, we need a system name. If
         # it's from a file, we need a file path.
-        if manager.has_option(section, 'Password Path'):
-            path = manager.load_option(section, 'Password Path', Path)
-            with path.open(mode='rb') as password_file:
-                password = encryption.locally_decrypt(password_file.read())
+        if manager.has_option(section, 'password path'):
+            path = manager.load_option(section, 'password path', Path)
+            if path == passwords.get_master_password_path():
+                password = passwords.get_master_password(refresh=False)
+            else:
+                with path.open(mode='rb') as password_file:
+                    password = encryption.locally_decrypt(password_file.read()).decode('utf-8')
         else:
-            system_name = manager.load_option(section, 'System Name', str)
-            password = passwords.get_password(system_name, user)
+            password = passwords.get_password(domain, user)
 
-        return cls(*args, user=user, password=password, **kwargs)
+        return cls(*args, user=user, password=password, domain=domain, **kwargs)
 
     def __init__(self, user, password, domain):
-        super().__init__((user, password, domain))
+        super().__init__()
 
         assert user is None or (user and isinstance(user, str))
         assert password is None or (password and isinstance(password, str))

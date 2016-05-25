@@ -6,41 +6,38 @@ Setup script for attila package.
 """
 
 import os
-from setuptools import setup
+import sys
 
-# Load this library's information.
-from info import info
+from setuptools import setup, find_packages
+
+try:
+    # noinspection PyUnresolvedReferences
+    import infotags
+except ImportError:
+    print("This setup script depends on infotags. Please install infotags using the command, "
+          "'pip install infotags' and then run this setup script again.")
+    sys.exit(2)
+
+
+PACKAGE_NAME = 'attila'
 
 
 cwd = os.getcwd()
 if os.path.dirname(__file__):
     os.chdir(os.path.dirname(__file__))
 try:
+    info = infotags.get_info(PACKAGE_NAME)
+
+    # setup() doesn't expect this key.
+    if 'doc' in info:
+        del info['doc']
+
     setup(
-        # Stuff extracted from the library info:
-        name=info['name'],
-        author=info['author'],
-        author_email=info['author_email'],
-        version=info['version'],
-        long_description=info['doc'],
+        packages=find_packages(),
+        **info
 
-        # Stuff we might have to set by hand if it's non-standard:
-        packages=[info['name']],
-
-        # Stuff we definitely have to set by hand:
-        description="Saint Attila: Automation Library",
-        license='MIT (https://opensource.org/licenses/MIT)',
-        install_requires=[
-            # 3rd-party:
-            'appdirs',
-            'cryptography',
-            'wmi',
-
-            # In-house:
-        ],
-
-        # Registration of built-in plugins. See http://stackoverflow.com/a/9615473/4683578 for an
-        # explanation of how plugins work in the general case. Other, separately installable
+        # Registration of built-in plugins. See http://stackoverflow.com/a/9615473/4683578 for
+        # an explanation of how plugins work in the general case. Other, separately installable
         # packages can register their own plugins using this file as an example. They will be
         # available by name during parsing of config files for automations built using attila.
         # entry_points={

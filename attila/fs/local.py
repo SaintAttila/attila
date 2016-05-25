@@ -78,7 +78,7 @@ class local_fs_connection(fs_connection):
         if connector is None:
             connector = LocalFSConnector()
         else:
-            assert isinstance(connector, LocalFSConnector)
+            verify_type(connector, LocalFSConnector)
         super().__init__(connector)
         super().open()  # local fs connections are always open.
 
@@ -98,6 +98,16 @@ class local_fs_connection(fs_connection):
             return NotImplemented
         return isinstance(other, local_fs_connection)
 
+    def is_local(self, path):
+        """
+        Whether the path refers to a local file system object.
+
+        :param path: The path to check.
+        :return: A bool.
+        """
+        self.check_path(path)
+        return True
+
     @property
     def cwd(self):
         """The current working directory of this file system new_instance."""
@@ -110,8 +120,20 @@ class local_fs_connection(fs_connection):
     @cwd.setter
     def cwd(self, path):
         """The current working directory of this file system new_instance."""
-        path = self.check_path(path)
-        os.chdir(path)
+        os.chdir(self.check_path(path))
+
+    def check_path(self, path, expand_user=True):
+        """
+        Verify that the path is valid for this file system connection, and return it in string form.
+
+        :param path: The path to check.
+        :param expand_user: Whether to expand the user home symbol (~).
+        :return: The path, as a string value.
+        """
+        path = super().check_path(path)
+        if expand_user:
+            path = os.path.expanduser(path)
+        return path
 
     def find(self, path, include_cwd=True):
         """
@@ -281,7 +303,7 @@ class local_fs_connection(fs_connection):
         :return: A list of matching file and directory names.
         """
         path = self.check_path(path)
-        assert self.is_dir(path)
+        self.verify_is_dir(path)
 
         if pattern == '*':
             return os.listdir(path)
@@ -290,14 +312,14 @@ class local_fs_connection(fs_connection):
 
     def glob(self, path, pattern='*'):
         """
-        Return a list of the paths to the files and directories appearing in this folder.
+        Return a list of the source_paths to the files and directories appearing in this folder.
 
         :param path: The path to operate on.
         :param pattern: A glob-style pattern against which names must match.
         :return: A list of Path instances for each matching file and directory name.
         """
         path = self.check_path(path)
-        assert self.is_dir(path)
+        self.verify_is_dir(path)
         return [Path(match) for match in glob.iglob(os.path.join(path, pattern))]
 
     def open_file(self, path, mode='r', buffering=-1, encoding=None, errors=None, newline=None,
@@ -316,7 +338,12 @@ class local_fs_connection(fs_connection):
         :return: The opened file object.
         """
         path = self.check_path(path)
-        assert self.is_file(path)
+
+        verify_type(mode, str, non_empty=True)
+        mode = mode.lower()
+
+        self.verify_is_not_dir(path)
+
         return open(path, mode, buffering, encoding, errors, newline, closefd, opener)
 
     def remove(self, path):
@@ -327,7 +354,7 @@ class local_fs_connection(fs_connection):
         """
         path = self.check_path(path)
 
-        assert self.exists(path)
+        self.verify_exists(path)
 
         if not os.access(path, os.W_OK):
             os.chmod(path, stat.S_IWRITE)

@@ -2,19 +2,21 @@
 A standardized automation environment
 """
 
-import configparser
 import datetime
 import inspect
 import logging
+import os
 import threading
+import warnings
 
 from functools import wraps
 
 
 from .abc.files import Path
 
-from .configurations import get_automation_config_manager, ConfigManager
+from .configurations import get_automation_config_manager, ConfigManager, iter_config_search_paths
 from .exceptions import verify_type, verify_callable
+from .utility import last
 
 
 __author__ = 'Aaron Hosford'
@@ -22,6 +24,7 @@ __all__ = [
     'get_entry_point_name',
     'task',
     'automation',
+    'auto_context',
 ]
 
 
@@ -42,7 +45,11 @@ def get_entry_point_name(default=None):
         if f_code:
             co_filename = getattr(f_code, 'co_filename', None)
             if co_filename:
-                result = inspect.getmodulename(co_filename) or result
+                module_name = inspect.getmodulename(co_filename)
+                if module_name == '__init__':
+                    module_name = os.path.basename(os.path.dirname(co_filename))
+                if module_name:
+                    result = module_name
             if getattr(f_code, 'co_name', None) == '<module>':
                 break  # Anything after this point is just bootstrapping code and should be ignored.
         frame = getattr(frame, 'f_back', None)
@@ -81,10 +88,10 @@ class task:
 
         self._description = description
 
-        context = automation.current()
+        context = auto_context.current()
 
         if context is not None:
-            assert isinstance(context, automation)
+            assert isinstance(context, auto_context)
             self.start_notifier = context.task_start_notifier
             self.success_notifier = context.task_success_notifier
             self.failure_notifier = context.task_failure_notifier
@@ -215,7 +222,7 @@ class task:
         return False  # Indicates exceptions should NOT be suppressed.
 
 
-class automation:
+class auto_context:
     """
     Interface for automation processes to access environment and configuration settings.
     """
@@ -246,7 +253,7 @@ class automation:
             return stack[-1]
         return default
 
-    def __init__(self, name=None, config_loader=None, start_time=None):
+    def __init__(self, name=None, manager=None, start_time=None):
         if start_time is None:
             start_time = datetime.datetime.now()
         verify_type(start_time, datetime.datetime)
@@ -255,44 +262,52 @@ class automation:
             name = get_entry_point_name('UNKNOWN')
         verify_type(name, str, non_empty=True)
 
-        if config_loader is None:
-            local_config_loader = ConfigManager(name)
-        elif not isinstance(config_loader, ConfigManager):
-            local_config_loader = ConfigManager(config_loader)
-        else:
-            local_config_loader = config_loader
-        verify_type(local_config_loader, ConfigManager)
-
-        shared_config_loader = get_automation_config_manager()
+        shared_manager = get_automation_config_manager()
+        fallbacks = [shared_manager]
 
         # Combine the config loaders into a default hierarchy.
-        config_loader = ConfigManager(
-            configparser.ConfigParser(),
-            fallbacks=[local_config_loader, shared_config_loader]
+        if manager is None:
+            manager = ConfigManager(name, fallbacks=fallbacks)
+        elif not isinstance(manager, ConfigManager):
+            manager = ConfigManager(manager, fallbacks=fallbacks)
+        else:
+            fallbacks.insert(0, manager)
+            manager = ConfigManager(name, fallbacks=fallbacks)
+        verify_type(manager, ConfigManager)
+
+        automation_root = shared_manager.load_option(
+            'Environment',
+            'Automation Root',
+            Path,
+            default=Path('~/.automation')
         )
+        assert isinstance(automation_root, Path)
+        assert automation_root.is_local
 
-        root_dir = config_loader.load_option('Environment', 'Root Path', Path, 
-                                             default=Path('~/.automation'))
+        manager.set_option('Environment', 'Automation Name', name)
 
-        workspace_dir = config_loader.load_option('Environment', 'Workspace Folder Path', Path,
-                                                  default=root_dir['workspace'][name])
-        log_dir = config_loader.load_option('Environment', 'Log Folder Path', Path,
-                                            default=root_dir['logs'][name])
-        docs_dir = config_loader.load_option('Environment', 'Documentation Folder Path', Path,
-                                             default=root_dir['docs'][name])
-        data_dir = config_loader.load_option('Environment', 'Data Folder Path', Path,
-                                             default=root_dir['data'][name])
+        root_dir = manager.load_option('Environment', 'Root Path', Path,
+                                       default=automation_root / name)
 
-        log_file_name_template = config_loader.load_option(
+        workspace_dir = manager.load_option('Environment', 'Workspace Folder Path', Path,
+                                            default=root_dir / 'workspace')
+        log_dir = manager.load_option('Environment', 'Log Folder Path', Path,
+                                      default=root_dir / 'logs')
+        docs_dir = manager.load_option('Environment', 'Documentation Folder Path', Path,
+                                       default=root_dir / 'docs')
+        data_dir = manager.load_option('Environment', 'Data Folder Path', Path,
+                                       default=root_dir / 'data')
+
+        log_file_name_template = manager.load_option(
             'Environment',
             'Log File Name Template',
             str,
             default='%Y%m%d%H%M%S.log'
         )
-        log_entry_format = config_loader.load('Environment', 'Log Entry Format', str,
-                                              default='%(asctime)s_pid:%(process)d ~*~ %(message)s')
-        log_level = config_loader.load('Environment', 'Log Level', str,
-                                       default='INFO')
+        log_entry_format = manager.load('Environment', 'Log Entry Format', str,
+                                        default='%(asctime)s_pid:%(process)d ~*~ %(message)s')
+        log_level = manager.load('Environment', 'Log Level', str,
+                                 default='INFO')
 
         log_file_name = start_time.strftime(log_file_name_template)
         log_file_path = log_dir[log_file_name]
@@ -305,42 +320,50 @@ class automation:
 
         # Start of automation
         automation_start_notifier = \
-            config_loader.load_option('Environment', 'Automation Start Notifier')
-        verify_callable(automation_start_notifier)
+            manager.load_option('Environment', 'Automation Start Notifier', default=None)
+        verify_callable(automation_start_notifier, allow_none=True)
 
         # Error (not necessarily terminated or a failure)
         automation_error_notifier = \
-            config_loader.load_option('Environment', 'Automation Error Notifier')
-        verify_callable(automation_error_notifier)
+            manager.load_option('Environment', 'Automation Error Notifier', default=None)
+        verify_callable(automation_error_notifier, allow_none=True)
 
         # End of automation
         automation_end_notifier = \
-            config_loader.load_option('Environment', 'Automation End Notifier')
-        verify_callable(automation_end_notifier)
+            manager.load_option('Environment', 'Automation End Notifier', default=None)
+        verify_callable(automation_end_notifier, allow_none=True)
 
         # Start of task
-        task_start_notifier = config_loader.load_option('Environment', 'Task Start Notifier')
-        verify_callable(task_start_notifier)
+        task_start_notifier = \
+            manager.load_option('Environment', 'Task Start Notifier', default=None)
+        verify_callable(task_start_notifier, allow_none=True)
 
         # Task completed successfully (not necessarily terminated)
-        task_success_notifier = config_loader.load_option('Environment', 'Task Success Notifier')
-        verify_callable(task_success_notifier)
+        task_success_notifier = \
+            manager.load_option('Environment', 'Task Success Notifier', default=None)
+        verify_callable(task_success_notifier, allow_none=True)
 
         # Task failure (not necessarily terminated or an error)
-        task_failure_notifier = config_loader.load_option('Environment', 'Task Failure Notifier')
-        verify_callable(task_failure_notifier)
+        task_failure_notifier = \
+            manager.load_option('Environment', 'Task Failure Notifier', default=None)
+        verify_callable(task_failure_notifier, allow_none=True)
 
         # Error (not necessarily terminated or a failure)
-        task_error_notifier = config_loader.load_option('Environment', 'Task Error Notifier')
-        verify_callable(automation_error_notifier)
+        task_error_notifier = \
+            manager.load_option('Environment', 'Task Error Notifier', default=None)
+        verify_callable(automation_error_notifier, allow_none=True)
 
         # Task failure (not necessarily terminated or an error)
-        task_end_notifier = config_loader.load_option('Environment', 'Task End Notifier')
-        verify_callable(task_end_notifier)
+        task_end_notifier = manager.load_option('Environment', 'Task End Notifier', default=None)
+        verify_callable(task_end_notifier, allow_none=True)
+
+        self._automation_root = automation_root
 
         self._name = name
-        self._config_loader = config_loader
+        self._manager = manager
+        self._start_time = start_time
 
+        self._root_dir = root_dir
         self._workspace = workspace_dir
         self._log_dir = log_dir
         self._docs_dir = docs_dir
@@ -348,6 +371,7 @@ class automation:
 
         self._log_file_path = log_file_path
         self._log_entry_format = log_entry_format
+        self._log_level = log_level
 
         self._automation_start_notifier = automation_start_notifier
         self._automation_error_notifier = automation_error_notifier
@@ -359,6 +383,45 @@ class automation:
         self._task_error_notifier = task_error_notifier
         self._task_end_notifier = task_end_notifier
 
+        for path in workspace_dir, log_dir, docs_dir, data_dir:
+            assert isinstance(path, Path)
+            if not path.is_dir:
+                path.make_dir()
+
+    def post_install_hook(self):
+        """
+        This is called by attila.installation.setup() after installation completes, which gives the
+        automation the opportunity to install its config and data files in the appropriate location
+        based on the local attila installation's configuration.
+        """
+
+        current_config_path = last(iter_config_search_paths(self._name), None)
+        if current_config_path is None:
+            warnings.warn("Config file not found.")
+        current_config_path = Path(current_config_path)
+        current_config_path.verify_is_file()
+
+        preferred_config_path = self._manager.load_option(
+            'Environment',
+            'Preferred Config Path',
+            Path,
+            default=self._root_dir / (self._name + '.ini')
+        )
+        assert isinstance(preferred_config_path, Path)
+
+        if not preferred_config_path.is_file:
+            preferred_config_path.verify_not_exists()
+            current_config_path.copy_to(preferred_config_path)
+
+    @property
+    def automation_root(self):
+        """
+        The root folder for all automations.
+
+        :return: A Path instance.
+        """
+        return self._automation_root
+
     @property
     def name(self):
         """
@@ -369,13 +432,22 @@ class automation:
         return self._name
 
     @property
-    def config_loader(self):
+    def manager(self):
         """
-        The config loader for this automation's settings.
+        The config manager for this automation's settings.
 
         :return: A ConfigManager instance.
         """
-        return self._config_loader
+        return self._manager
+
+    @property
+    def root_dir(self):
+        """
+        The root directory where this automation's files are housed.
+
+        :return: A Path instance.
+        """
+        return self._root_dir
 
     @property
     def workspace(self):
@@ -404,6 +476,24 @@ class automation:
         :return: A Path instance.
         """
         return self._log_file_path
+
+    @property
+    def log_entry_format(self):
+        """
+        The log format the automation should use.
+
+        :return: A string.
+        """
+        return self._log_entry_format
+
+    @property
+    def log_level(self):
+        """
+        The log level the automation should use.
+
+        :return: An integer.
+        """
+        return self._log_level
 
     @property
     def docs_dir(self):
@@ -498,12 +588,32 @@ class automation:
 
     def __enter__(self):
         self._get_stack().append(self)
+        if self._automation_start_notifier is not None:
+            self._automation_start_notifier(
+                task=self._name,
+                event='start',
+                time=self._start_time
+            )
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if exc_type or exc_val or exc_tb:
-            self._automation_error_notifier(exc_type, exc_val, exc_tb)
-        self.automation_end_notifier()
+        if self._automation_error_notifier is not None and (exc_type or exc_val or exc_tb):
+            # TODO: Add a way to specify ignored errors, either in this class or in the notifiers,
+            #       so we have a way to turn off BdbQuit and SystemExit spam. This should really
+            #       only be done for emails, not for database, log, or other impersonal reporting,
+            #       so I suspect it will need to be done at the notifier level, not here.
+            self._automation_error_notifier(
+                task=self._name,
+                event='exception',
+                time=datetime.datetime.now(),
+                exc_info=(exc_type, exc_val, exc_tb)
+            )
+        if self._automation_end_notifier is not None:
+            self._automation_end_notifier(
+                task=self._name,
+                event='end',
+                time=datetime.datetime.now()
+            )
         self._get_stack().pop()
         return False  # Do not suppress exceptions.
 
@@ -517,4 +627,24 @@ class automation:
             with self:
                 return function(*args, **kwargs)
 
+        wrapper.context = self
+
         return wrapper
+
+
+def automation(name=None, manager=None, start_time=None):
+    """
+    Decorator for wrapping main() in an automation context.
+
+    :param name: The name of the automation.
+    :param manager: The configuration manager.
+    :param start_time: The time the automation started.
+    :return: An automation context decorator.
+    """
+    if callable(name):
+        function = name
+        assert manager is None and start_time is None
+        context = auto_context()
+        return context(function)
+    else:
+        return auto_context(name, manager, start_time)

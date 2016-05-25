@@ -50,6 +50,9 @@ __all__ = [
 ]
 
 
+ADODB_CONNECTION_COM_CLASS_NAME = "ADODB.Connection"
+
+
 class Constants:
     """
     Microsoft-defined constants for use with ADODB. These have the original names (as ugly as they
@@ -232,12 +235,12 @@ class ADODBConnector(connections.Connector, configurations.Configurable):
 
         verify_type(section, str, non_empty=True)
 
-        server = manager.load_option(section, 'Server', str)
-        database = manager.load_option(section, 'Database', str)
-        driver = manager.load_option(section, 'Driver', str, default=None)
-        trusted = manager.load_option(section, 'Trusted', str, default=None)
+        server = manager.load_option(section, 'server', str)
+        database = manager.load_option(section, 'database', str)
+        driver = manager.load_option(section, 'driver', str, default=None)
+        trusted = manager.load_option(section, 'trusted', 'bool', default=None)
 
-        credential = manager.load_option(section, 'Credential',
+        credential = manager.load_option(section, 'credential',
                                          credentials.Credential,
                                          default=None)
         if credential is None:
@@ -350,11 +353,46 @@ class ADODBConnector(connections.Connector, configurations.Configurable):
 
 # noinspection PyPep8Naming
 @config_loader
-class adodb_connection(sql.sql_connection, transactions.transactional_connection):
+class adodb_connection(sql.sql_connection, transactions.transactional_connection,
+                       configurations.Configurable):
     """
     An adodb_connection manages the state for a new_instance to a SQL server via ADODB, providing an
     interface for executing queries and commands.
     """
+
+    @classmethod
+    def load_config_value(cls, manager, value, *args, **kwargs):
+        """
+        Load a class instance from the value of a config option.
+
+        :param manager: A ConfigManager instance.
+        :param value: The string value of the option.
+        :return: A new instance of this class.
+        """
+        verify_type(manager, ConfigManager)
+        assert isinstance(manager, ConfigManager)
+        verify_type(value, str)
+        connector = manager.load_value(value, ADODBConnector)
+        return cls(*args, connector=connector, **kwargs)
+
+    @classmethod
+    def load_config_section(cls, manager, section, *args, **kwargs):
+        """
+        Load a class instance from a config section.
+
+        :param manager: A ConfigManager instance.
+        :param section: The name of the section.
+        :return: A new instance of this class.
+        """
+        verify_type(manager, ConfigManager)
+        assert isinstance(manager, ConfigManager)
+        verify_type(section, str, non_empty=True)
+
+        if manager.has_option(section, 'Connector'):
+            connector = manager.load_option(section, 'Connector', ADODBConnector)
+        else:
+            connector = manager.load_section(section, ADODBConnector)
+        return cls(*args, connector=connector, **kwargs)
 
     def __init__(self, connector, command_timeout=None, connection_timeout=None,
                  auto_reconnect=True, cursor_location=None):
@@ -403,7 +441,7 @@ class adodb_connection(sql.sql_connection, transactions.transactional_connection
         if self._com_object is not None and (self._com_object.State & Constants.adStateOpen):
             return  # If it's open already, do nothing.
 
-        self._com_object = win32com.client.Dispatch("ADODB.adodb_connection")
+        self._com_object = win32com.client.Dispatch(ADODB_CONNECTION_COM_CLASS_NAME)
 
         # The command timeout is how long it takes to complete a command.
         self._com_object.CommandTimeout = self._command_timeout
@@ -414,7 +452,9 @@ class adodb_connection(sql.sql_connection, transactions.transactional_connection
 
     def close(self):
         """Close the ADODB new_instance"""
-        return self._com_object.Close()
+        if self.is_open:
+            return self._com_object.Close()
+        super().close()
 
     def begin(self):
         """Begin a new transaction, returning the transaction nesting depth."""
@@ -439,7 +479,8 @@ class adodb_connection(sql.sql_connection, transactions.transactional_connection
         :return: A cursor COM object (for queries) or None.
         """
         if self._auto_reconnect:
-            self.open()
+            if not self.is_open:
+                self.open()
             try:
                 return self._com_object.Execute(command)
             except:

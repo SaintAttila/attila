@@ -351,7 +351,7 @@ class DateTimeParser(Configurable):
 
         # If a name was given, register the parser instance's parse method as a config loader.
         if name:
-            manager.add_loader(name, result.parse)
+            manager.set_loader(name, result.parse)
 
         return result
 
@@ -447,7 +447,7 @@ class USDateTimeParser(DateTimeParser):
 
         # If a name was given, register the parser instance's parse method as a config loader.
         if name:
-            manager.add_loader(name, result.parse)
+            manager.set_loader(name, result.parse)
 
         return result
 

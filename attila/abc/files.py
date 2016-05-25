@@ -59,7 +59,7 @@ class temp_cwd:
     """
 
     def __init__(self, path):
-        assert isinstance(path, Path)
+        verify_type(path, Path)
         self._path = path
         self._previous_path = None
 
@@ -103,7 +103,7 @@ class Path(Configurable):
 
         :param connection: The new default file system connection.
         """
-        assert connection is None or isinstance(connection, fs_connection)
+        verify_type(connection, fs_connection, allow_none=True)
         cls._default_connection = connection
 
     @classmethod
@@ -293,18 +293,41 @@ class Path(Configurable):
 
     def __contains__(self, item):
         if isinstance(item, str):
-            assert item
+            verify_type(item, str, non_empty=True)
             return item in self.list() or Path(item, self._connection) in self.glob()
-        else:
-            assert isinstance(item, Path)
+        elif isinstance(item, Path):
             return item in self.glob()
+        else:
+            return NotImplemented
 
     def __len__(self):
         return len(self.list())
 
     def __getitem__(self, item):
-        assert isinstance(item, (str, Path))
-        return self._connection.join(self, item)
+        if isinstance(item, (str, Path)):
+            result = self._connection.join(self, item)
+            assert isinstance(result, Path)
+            return result
+        else:
+            return NotImplemented
+
+    def __truediv__(self, other):
+        if isinstance(other, (str, Path)):
+            result = self._connection.join(self, other)
+            assert isinstance(result, Path)
+            return result
+        else:
+            return NotImplemented
+
+    def __rtruediv__(self, other):
+        # No need to check if other is a Path instance; that case will always be handled by
+        # __truediv__, and so we won't ever see it here.
+        if isinstance(other, str):
+            result = self._connection.join(other, self)
+            assert isinstance(result, Path)
+            return result
+        else:
+            return NotImplemented
 
     def __and__(self, other):
         if not isinstance(other, Path) or self._connection != other.connection:
@@ -321,6 +344,11 @@ class Path(Configurable):
             if this is None or other is None:
                 return None
         return this
+
+    @property
+    def is_local(self):
+        """Whether this path refers to a local file system."""
+        return self._connection.is_local(self)
 
     @property
     def is_dir(self):
@@ -407,6 +435,48 @@ class Path(Configurable):
         """The extension of the file system object, or the empty string."""
         return self._connection.extension(self)
 
+    def verify_exists(self):
+        """
+        Verify that the file system object exists. If not, raise an appropriate exception.
+
+        :return: None
+        """
+        self._connection.verify_exists(self)
+
+    def verify_not_exists(self):
+        """
+        Verify that the file system object does *not* exist. If it does, raise an appropriate
+        exception.
+
+        :return: None
+        """
+        self._connection.verify_not_exists(self)
+
+    def verify_is_file(self):
+        """
+        Verify that the file system object is a file. If not, raise an appropriate exception.
+
+        :return: None
+        """
+        self._connection.verify_is_file(self)
+
+    def verify_is_dir(self):
+        """
+        Verify that the file system object is a directory. If not, raise an appropriate exception.
+
+        :return: None
+        """
+        self._connection.verify_is_dir(self)
+
+    def verify_is_not_dir(self):
+        """
+        Verify that the file system object either does not exist or is not a directory. If it is a
+        directory, raise an appropriate exception.
+
+        :return: None
+        """
+        self._connection.verify_is_not_dir(self)
+
     def find(self, include_cwd=True):
         """
         Try to look up the file system object using the PATH system environment variable. Return the
@@ -430,7 +500,7 @@ class Path(Configurable):
 
     def glob(self, pattern='*'):
         """
-        Return a list of the paths to the files and directories appearing in this folder.
+        Return a list of the source_paths to the files and directories appearing in this folder.
 
         :param pattern: A glob-style pattern against which names must match.
         :return: A list of Path instances for each matching file and directory name.
@@ -784,7 +854,7 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
         return cls(*args, connector=connector, **kwargs)
 
     def __init__(self, connector):
-        assert isinstance(connector, FSConnector)
+        verify_type(connector, FSConnector)
         super().__init__(connector)
 
     def __eq__(self, other):
@@ -823,9 +893,67 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
         if isinstance(path, str):
             return path
         else:
-            assert isinstance(path, Path)
+            verify_type(path, Path)
             assert path.connection == self
             return str(path)
+
+    def verify_exists(self, path):
+        """
+        Verify that the path exists for this file system connection. If not, raise an appropriate
+        exception.
+
+        :param path: The path to check.
+        :return: None
+        """
+        if not self.exists(path):
+            raise FileNotFoundError(path)
+
+    def verify_not_exists(self, path):
+        """
+        Verify that the path does *not* exist for this file system connection. If it does, raise an
+        appropriate exception.
+
+        :param path: The path to check.
+        :return: None
+        """
+        if self.exists(path):
+            if self.is_dir(path):
+                raise IsADirectoryError(path)
+            else:
+                raise FileExistsError(path)
+
+    def verify_is_file(self, path):
+        """
+        Verify that the path refers to an existing file for this file system connection. If not,
+        raise an appropriate exception.
+
+        :param path: The path to check.
+        :return: None
+        """
+        if not self.is_file(path):
+            raise FileNotFoundError(path)
+
+    def verify_is_dir(self, path):
+        """
+        Verify that the path refers to an existing directory for this file system connection. If
+        not, raise an appropriate exception.
+
+        :param path: The path to check.
+        :return: None
+        """
+        if not self.is_dir(path):
+            raise NotADirectoryError(path)
+
+    def verify_is_not_dir(self, path):
+        """
+        Verify that the path does *not* refer to an existing directory for this file system
+        connection. If it does, raise an appropriate exception.
+
+        :param path: The path to check.
+        :return: None
+        """
+        if self.is_dir(path):
+            raise IsADirectoryError(path)
 
     def find(self, path, include_cwd=True):
         """
@@ -838,8 +966,17 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
         :param include_cwd: Whether the current working directory be checked before the PATH.
         :return: A Path representing the located object, or None.
         """
-
         raise OperationNotSupportedError()
+
+    def is_local(self, path):
+        """
+        Whether the path refers to a local file system object.
+
+        :param path: The path to check.
+        :return: A bool.
+        """
+        self.check_path(path)
+        return False
 
     @property
     def temp_dir(self):
@@ -1059,7 +1196,7 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
 
     def glob(self, path, pattern='*'):
         """
-        Return a list of the paths to the files and directories appearing in this folder.
+        Return a list of the source_paths to the files and directories appearing in this folder.
 
         :param path: The path to operate on.
         :param pattern: A glob-style pattern against which names must match.
@@ -1093,7 +1230,7 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
         :param encoding: The file encoding used to open the file.
         :return: An iterator over the lines in the file, without newlines.
         """
-        assert self.is_file(path)
+        self.verify_is_file(path)
 
         with self.open_file(path, encoding=encoding) as file_obj:
             for line in file_obj:
@@ -1152,9 +1289,15 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
         :param encoding: The encoding of the file.
         :return: The number of lines written.
         """
-        path = self.check_path(path)
         assert not overwrite or not append
-        assert not self.exists(path) or ((overwrite or append) and self.is_file(path))
+
+        path = self.check_path(path)
+
+        if overwrite or append:
+            if self.exists(path):
+                self.verify_is_file(path)
+        else:
+            self.verify_not_exists(path)
 
         with self.open_file(path, mode=('a' if append else 'w'), encoding=encoding) as file_obj:
             index = -1
@@ -1176,9 +1319,15 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
         :param encoding: The encoding of the file.
         :return: The number of lines written.
         """
-        path = self.check_path(path)
         assert not overwrite or not append
-        assert not self.exists(path) or ((overwrite or append) and self.is_file(path))
+
+        path = self.check_path(path)
+
+        if overwrite or append:
+            if self.exists(path):
+                self.verify_is_file(path)
+        else:
+            self.verify_not_exists(path)
 
         with self.open_file(path, mode=('a' if append else 'w'), encoding=encoding, newline='') \
                 as file_obj:
@@ -1203,7 +1352,7 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
         if not self.exists(path):
             return mode == 'w'
 
-        assert not self.is_dir(path)
+        self.verify_is_not_dir(path)
 
         if mode == 'w':
             open_mode = 'a'
@@ -1227,10 +1376,12 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
         :param path: The path to operate on.
         :param interval: The number of seconds to wait between checks. Default is 1 second.
         """
+        verify_type(interval, (int, float), allow_none=True)
 
-        assert interval is None or interval > 0
         if interval is None:
             interval = 1
+        else:
+            assert interval > 0
 
         initial_size = self.size(path)
         time.sleep(interval)
@@ -1326,15 +1477,17 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
             # make the whole thing perfectly atomic, but it eliminates most cases where we start to
             # do things and then find out we shouldn't have.
 
-            self.copy_to(self, destination, overwrite, clear, fill, check_only=True)
+            self.copy_to(path, destination, overwrite, clear, fill, check_only=True)
 
             # If we don't do this, we'll do a redundant check first on each step in the recursion.
             check_only = False
 
         path = self.check_path(path)
 
-        assert isinstance(destination, Path)
-        assert self.exists(path)
+        verify_type(destination, Path)
+        destination = abs(destination)
+
+        self.verify_exists(path)
 
         # Create the target directory, if necessary. Do not clear it, regardless of the clear flag's
         # value, as this is the new *parent* folder of the file object to be copied, and the clear
@@ -1346,7 +1499,7 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
             for child in self.glob(path):
                 child.copy_into(destination, overwrite, clear, fill, check_only)
         else:
-            assert self.is_file(path)
+            self.verify_is_file(path)
 
             if destination.exists:
                 # It's not a folder, and it's in our way.
@@ -1406,7 +1559,9 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
         :return: None
         """
         path = Path(self.check_path(path), self)
-        assert new_name and isinstance(new_name, str)
+
+        verify_type(new_name, str, non_empty=True)
+
         if path.name != new_name:
             self.move_to(path, path.dir[new_name], overwrite=False, clear=True, fill=False)
 

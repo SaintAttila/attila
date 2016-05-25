@@ -250,7 +250,7 @@ class ftp_connection(fs_connection):
         dir_path, file_name = os.path.split(remote_path)
 
         with Path(dir_path, self):
-            with open(local_path, 'wb') as local_file:
+            with open(abs(local_path), 'wb') as local_file:
                 self._session.retrbinary("RETR " + file_name, local_file.write)
 
     def _upload(self, local_path, remote_path):
@@ -261,7 +261,7 @@ class ftp_connection(fs_connection):
         dir_path, file_name = os.path.split(remote_path)
 
         with Path(dir_path, self):
-            with open(local_path, 'rb') as local_file:
+            with open(abs(local_path), 'rb') as local_file:
                 self._session.retrbinary("STOR " + file_name, local_file)
 
     def open_file(self, path, mode='r', buffering=-1, encoding=None, errors=None, newline=None,

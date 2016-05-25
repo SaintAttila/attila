@@ -54,7 +54,7 @@ class connection(metaclass=ABCMeta):
         self._is_open = False
 
     def __del__(self):
-        if self._is_open:
+        if getattr(self, '_is_open', None):
             self.close()
 
     @property
