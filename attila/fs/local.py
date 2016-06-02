@@ -122,17 +122,20 @@ class local_fs_connection(fs_connection):
         """The current working directory of this file system new_instance."""
         os.chdir(self.check_path(path))
 
-    def check_path(self, path, expand_user=True):
+    def check_path(self, path, expand_user=True, expand_vars=True):
         """
         Verify that the path is valid for this file system connection, and return it in string form.
 
         :param path: The path to check.
         :param expand_user: Whether to expand the user home symbol (~).
+        :param expand_vars: Whether to expand environment variables appearing in the path.
         :return: The path, as a string value.
         """
         path = super().check_path(path)
         if expand_user:
             path = os.path.expanduser(path)
+        if expand_vars:
+            path = os.path.expandvars(path)
         return path
 
     def find(self, path, include_cwd=True):
