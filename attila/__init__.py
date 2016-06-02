@@ -14,7 +14,7 @@ __long_description__ = __doc__
 __license__ = 'MIT (https://opensource.org/licenses/MIT)'
 __requires__ = ['cryptography', 'infotags', 'pywin32', 'setuptools', 'wmi']
 __url__ = 'TBD'
-__version__ = '1.0'
+__version__ = '1.1'
 
 
 plugins.load_plugins()
