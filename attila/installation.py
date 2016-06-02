@@ -2,15 +2,16 @@
 Installation mechanisms for attila.
 """
 
-import os
-
 from importlib.machinery import SourceFileLoader
 
 from setuptools import setup as _setup
 from setuptools import find_packages
 from setuptools.command.install import install as _install
 
+from .abc.files import Path
+# from .configurations import get_attila_config_manager, get_automation_config_manager
 from .exceptions import verify_type
+# from .fs.local import local_fs_connection
 
 
 __author__ = 'Aaron Hosford'
@@ -30,9 +31,9 @@ class install(_install):
 
         # Find the package
         package_name = self.config_vars['dist_name']
-        for path in package_name + '.py', os.path.join(package_name, '__init__.py'):
-            if os.path.isfile(path):
-                import_path = os.path.abspath(path)
+        for path in Path(package_name + '.py'), Path(package_name) / '__init__.py':
+            if path.is_file:
+                import_path = str(abs(path))
                 break
         else:
             # Nothing to do; we can't find the module to import it.
@@ -120,3 +121,95 @@ def setup(*args, **kwargs):
     #     )
 
     return _setup(*args, **kwargs)
+
+
+# # noinspection PyPep8Naming,PyClassHasNoInit
+# class config_install(_install):
+#     """
+#     Extends the standard setuptools "install" command to do some additional work.
+#     """
+#
+#     def run(self):
+#         """
+#         Run the command.
+#         """
+#         result = super().run()
+#
+#         # Determine the root folder where the config files will be installed
+#         install_path = Path(self.config_vars['install_path'])
+#
+#         # For each config file, copy it into the root folder, preserving the folder structure.
+#         for config_file in self.config_vars['config_files']:
+#             config_file = Path(config_file)
+#             destination = install_path / config_file
+#             if destination.dir and not destination.dir.is_dir:
+#                 destination.dir.make_dir()
+#             config_file.copy_to(destination, overwrite=True)
+#
+#         return result
+#
+#
+# def config_setup(*args, config_files, automation_name=None, **kwargs):
+#     """
+#     Drop-in replacement for setuptools.setup(), tailored for the distribution of configuration
+#     files.
+#     """
+#
+#     # Verify automation name.
+#     verify_type(automation_name, str, non_empty=True, allow_none=True)
+#
+#     # Verify and normalize config file paths.
+#     normalized_config_files = []
+#     for config_file in config_files:
+#         if isinstance(config_file, Path):
+#             verify_type(config_file.connection, local_fs_connection)
+#             config_file = str(abs(config_file))
+#         verify_type(config_file, str, non_empty=True)
+#         assert Path(config_file).verify_is_file()
+#         normalized_config_files.append(config_file)
+#     config_files = normalized_config_files
+#
+#     # Get the installation requirements.
+#     if 'install_requires' in kwargs:
+#         install_requires = kwargs['install_requires']
+#         verify_type(install_requires, list)
+#     else:
+#         install_requires = []
+#         kwargs['install_requires'] = install_requires
+#
+#     # Determine the path where the config files should be placed. If an automation name was
+#     # specified, make sure the automation is included in the installation requirements.
+#     if automation_name is None:
+#         manager = get_attila_config_manager()
+#         install_path = str(abs(manager.load_option('Environment', 'Automation Root', Path)))
+#     else:
+#         for requirement in install_requires:
+#             if (requirement == automation_name or
+#                     (requirement.startswith(automation_name) and
+#                      requirement[len(automation_name):].strip()[:1] in '<>=!')):
+#                 break
+#         else:
+#             install_requires.append(automation_name)
+#
+#         manager = get_automation_config_manager()
+#         manager.set_option('Environment', 'Automation Name', automation_name)
+#         install_path = str(abs(manager.load_option('Environment', 'Preferred Config Path')))
+#
+#     # TODO:
+#     #   * Convert all config paths to relative form. (We should make a Path method to do this
+#     #     easily, if one doesn't already exist.)
+#     #   * Add config paths to package data so they get dumped into the dist.
+#
+#     # We have to include the config paths and install path as keyword args so config_install can
+#     # see them.
+#     kwargs['install_path'] = install_path
+#     kwargs['config_files'] = config_files
+#
+#     # The zip_safe argument must be set to False to ensure that the config files get extracted
+#     # during installation, making them available to config_install when it copies them to the
+#     # install path.
+#     kwargs['zip_safe'] = False
+#
+#     result = _setup(*args, **kwargs)
+#
+#     return result
