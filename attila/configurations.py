@@ -137,8 +137,8 @@ def get_default_config_search_dirs(file_name_base=None):
 
 def iter_config_search_paths(file_name_base, dirs=None, extensions=None):
     """
-    Iterate over the search source_paths for a configuration file. Only source_paths that actually exist are
-    included.
+    Iterate over the search source_paths for a configuration file. Only source_paths that actually
+    exist are included.
 
     :param file_name_base: The name of the config file, minus the extension.
     :param dirs: The directories in which to search.
