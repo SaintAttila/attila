@@ -2,11 +2,14 @@
 A standardized automation environment
 """
 
+import getpass
 import datetime
 import inspect
 import logging
 import os
+import socket
 import threading
+import traceback
 import warnings
 
 from functools import wraps
@@ -28,15 +31,26 @@ __all__ = [
 ]
 
 
-def get_entry_point_name(default=None):
+def get_entry_point_name(default=None, use_context=True):
     """
     Locate the module closest to where execution began and return its name. If no module could be
     identified (which can sometimes occur when running from some IDEs when a module is run without
     being saved first), returns default.
 
     :param default: The default return value if no module could be identified.
+    :param use_context: Whether to use the current automation context, if one is available.
     :return: The name of the identified module, or the default value.
     """
+
+    if use_context:
+        # First, check to see if we have an automation context; this will be the most reliable means
+        # of determining the correct name, if it is available.
+        current_context = auto_context.current()
+        if current_context is not None:
+            assert isinstance(current_context, auto_context)
+            if current_context.name:
+                return current_context.name
+
     # My apologies in advance for what you are about to witness here...
     frame = inspect.currentframe()
     result = default
@@ -592,11 +606,20 @@ class auto_context:
             self._automation_start_notifier(
                 task=self._name,
                 event='start',
-                time=self._start_time
+                time=self._start_time,
+                user=getpass.getuser(),
+                host=socket.gethostname(),
+                exc_info=(None, None, None),
+                traceback=None
             )
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        traceback_string = None
+
+        if exc_tb and (self._automation_error_notifier or self._automation_end_notifier):
+            traceback_string = traceback.format_exc()
+
         if self._automation_error_notifier is not None and (exc_type or exc_val or exc_tb):
             # TODO: Add a way to specify ignored errors, either in this class or in the notifiers,
             #       so we have a way to turn off BdbQuit and SystemExit spam. This should really
@@ -605,15 +628,24 @@ class auto_context:
             self._automation_error_notifier(
                 task=self._name,
                 event='exception',
+                user=getpass.getuser(),
                 time=datetime.datetime.now(),
-                exc_info=(exc_type, exc_val, exc_tb)
+                host=socket.gethostname(),
+                exc_info=(exc_type, exc_val, exc_tb),
+                traceback=traceback_string
             )
+
         if self._automation_end_notifier is not None:
             self._automation_end_notifier(
                 task=self._name,
                 event='end',
-                time=datetime.datetime.now()
+                time=datetime.datetime.now(),
+                user=getpass.getuser(),
+                host=socket.gethostname(),
+                exc_info=(exc_type, exc_val, exc_tb),
+                traceback=traceback_string
             )
+
         self._get_stack().pop()
         return False  # Do not suppress exceptions.
 

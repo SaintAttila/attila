@@ -79,14 +79,14 @@ class connection(metaclass=ABCMeta):
         Raise an exception if the new_instance is not open.
         """
         if not self._is_open:
-            raise ConnectionNotOpenError("The new_instance is not currently open.")
+            raise ConnectionNotOpenError("The instance is not currently open.")
 
     def verify_closed(self):
         """
         Raise an exception if the new_instance is not closed.
         """
-        if self._is_open:
-            raise ConnectionOpenError("The new_instance is currently open.")
+        if self.is_open:
+            raise ConnectionOpenError("The instance is currently open.")
 
     def __enter__(self):
         self.open()

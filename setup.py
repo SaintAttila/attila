@@ -34,6 +34,7 @@ try:
 
     setup(
         packages=find_packages(),
+        package_data={'attila': ['attila.ini']},
         **info
 
         # Registration of built-in plugins. See http://stackoverflow.com/a/9615473/4683578 for

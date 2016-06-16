@@ -4,7 +4,16 @@ Bindings for sending email notifications.
 
 
 import datetime
+
+# Yes, these all have to be imported individually.
 import email
+import email.encoders
+import email.mime
+import email.mime.base
+import email.mime.text
+import email.mime.multipart
+import email.utils
+
 import getpass
 import os
 import smtplib
@@ -146,16 +155,11 @@ def send_email(server, sender, subject, body, to, cc=None, bcc=None, attachments
 
 def get_standard_footer():
     """
-    Generates a standard add_footer for all automated emails that includes account, server, time
-    stamp, and system (code entry point).
+    Generates a standard add_footer for all automated emails that includes user, host, time
+    stamp, and task (code entry point).
 
     :return: A add_footer, as a string.
     """
-
-    system = get_entry_point_name('UNKNOWN')
-    account = getpass.getuser()
-    server = socket.gethostname()
-    timestamp = datetime.datetime.now().strftime('%m/%d/%Y %I:%M:%S %p')
 
     # The default add_footer template. We wrap it in a call to textwrap.dedent
     # because triple-quoted strings preserve indentation.
@@ -163,10 +167,10 @@ def get_standard_footer():
         """
 
         **************************************************
-        ** System: \t{system}
-        ** Account:\t{account}
-        ** Server: \t{server}
-        ** Sent:   \t{timestamp}
+        ** Task:\t{task}
+        ** User:\t{user}
+        ** Host:\t{host}
+        ** Time:\t{time:%m/%d/%Y %I:%M:%S %p}
         **************************************************
         """
     )
@@ -174,16 +178,23 @@ def get_standard_footer():
     # Try to load the add_footer template from the automation config.
     # If it can't be found, just use the default provided above.
     config = get_automation_config_manager()
-    if 'Email' in config:
-        section = config['Email']
-        if 'Standard Footer' in section:
-            template = section['Standard Footer']
-        elif 'Standard Footer Path' in section:
-            path = section['Standard Footer Path']
-            with open(path) as template_file:
+    assert isinstance(config, ConfigManager)
+    if config.has_section('Email'):
+        if config.has_option('Email', 'Standard Footer'):
+            template = config.load_option('Email', 'Standard Footer')
+            verify_type(template, str)
+        elif config.has_option('Email', 'Standard Footer Path'):
+            path = config.load_option('Email', 'Standard Footer Path', Path)
+            assert isinstance(path, Path)
+            with path.open() as template_file:
                 template = template_file.read()
 
-    return template.format(system=system, account=account, server=server, timestamp=timestamp)
+    return template.format(
+        task=get_entry_point_name('UNKNOWN'),
+        user=getpass.getuser(),
+        host=socket.gethostname(),
+        time=datetime.datetime.now()
+    )
 
 
 @config_loader('EmailAddressList')
@@ -246,7 +257,8 @@ class EmailConnector(Connector, Configurable):
             *args,
             server=server,
             sender=sender,
-            to=to, cc=cc,
+            to=to,
+            cc=cc,
             bcc=bcc,
             use_html=html,
             **kwargs

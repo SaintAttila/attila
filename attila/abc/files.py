@@ -167,6 +167,13 @@ class Path(Configurable):
         self._location = location
         self._connection = connection
 
+        # Get rid of trailing slashes.
+        if self._location and not self.name:
+            parent = self.dir
+            if parent is not None:
+                assert isinstance(parent, Path)
+                self._location = parent._location
+
     def copy(self):
         """
         Create a copy of this path.
@@ -292,24 +299,22 @@ class Path(Configurable):
             return iter([])
 
     def __contains__(self, item):
+        verify_type(item, (str, Path))
         if isinstance(item, str):
             verify_type(item, str, non_empty=True)
             return item in self.list() or Path(item, self._connection) in self.glob()
-        elif isinstance(item, Path):
-            return item in self.glob()
         else:
-            return NotImplemented
+            assert isinstance(item, Path)
+            return item in self.glob()
 
     def __len__(self):
         return len(self.list())
 
     def __getitem__(self, item):
-        if isinstance(item, (str, Path)):
-            result = self._connection.join(self, item)
-            assert isinstance(result, Path)
-            return result
-        else:
-            return NotImplemented
+        verify_type(item, (str, Path))
+        result = self._connection.join(self, item)
+        assert isinstance(result, Path)
+        return result
 
     def __truediv__(self, other):
         if isinstance(other, (str, Path)):
@@ -330,7 +335,9 @@ class Path(Configurable):
             return NotImplemented
 
     def __and__(self, other):
-        if not isinstance(other, Path) or self._connection != other.connection:
+        if isinstance(other, str):
+            other = Path(other, self._connection)
+        elif not isinstance(other, Path) or self._connection != other.connection:
             return NotImplemented
         this = self
         while str(this) != str(other):
@@ -343,7 +350,25 @@ class Path(Configurable):
                 other = other.dir
             if this is None or other is None:
                 return None
+        assert isinstance(this, Path)
         return this
+
+    def __sub__(self, other):
+        if isinstance(other, str):
+            other = Path(other, self._connection)
+        elif not isinstance(other, Path) or self._connection != other.connection:
+            return NotImplemented
+        this = abs(self)
+        that = abs(other)
+        shared = this & that
+        shared_length = len(shared.split())
+        remainder = self._connection.join(*this.split()[shared_length:])
+        assert shared[remainder] == this
+        pieces = ['..'] * (len(that.split()) - shared_length)
+        pieces.append(remainder)
+        result = self._connection.join(*pieces)
+        assert abs(that[result]) == this
+        return result
 
     @property
     def is_local(self):
@@ -488,6 +513,22 @@ class Path(Configurable):
         :return: A Path representing the located object, or None.
         """
         return self._connection.find(self, include_cwd)
+
+    def split(self):
+        """
+        Return a list of the nested element names the path is composed of.
+
+        :return: A list of path elements.
+        """
+        remainder = self
+        result = []
+        while remainder and remainder.dir != remainder:
+            result.append(remainder.name)
+            remainder = remainder.dir
+        if remainder:
+            result.append(str(remainder))
+        result.reverse()
+        return result
 
     def list(self, pattern='*'):
         """
@@ -1021,8 +1062,15 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
         :return: The resulting path.
         """
         if path_elements:
-            return Path(os.path.join(*(self.check_path(element) for element in path_elements)),
-                        self)
+            # There is a known Python bug which causes any TypeError raised by a generator during
+            # argument interpolation with * to be incorrectly reported as:
+            #       TypeError: join() argument after * must be a sequence, not generator
+            # The bug is documented at:
+            #       https://mail.python.org/pipermail/new-bugs-announce/2009-January.txt
+            # To avoid this confusing misrepresentation of errors, I have broken this section out
+            # into multiple statements so TypeErrors get the opportunity to propagate correctly.
+            path_elements = tuple(self.check_path(element) for element in path_elements)
+            return Path(os.path.join(*path_elements), connection=self)
         else:
             return Path(connection=self)
 
@@ -1455,7 +1503,7 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
         :return: None
         """
 
-        self.copy_to(path, destination[self.name], overwrite, clear, fill, check_only)
+        self.copy_to(path, destination[path.name], overwrite, clear, fill, check_only)
 
     def copy_to(self, path, destination, overwrite=False, clear=False, fill=True, check_only=None):
         """
