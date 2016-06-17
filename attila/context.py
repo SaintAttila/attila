@@ -402,16 +402,21 @@ class auto_context:
             if not path.is_dir:
                 path.make_dir()
 
-    def post_install_hook(self):
+    def post_install_hook(self, overwrite=False):
         """
         This is called by attila.installation.setup() after installation completes, which gives the
         automation the opportunity to install its config and data files in the appropriate location
         based on the local attila installation's configuration.
         """
 
+        # TODO: This is broken; it finds the version at preferred_config_path instead of the one
+        #       inside the folder in site-packages, which basically means it tries to copy the old
+        #       file over itself if overwrite is set.
         current_config_path = last(iter_config_search_paths(self._name), None)
         if current_config_path is None:
             warnings.warn("Config file not found.")
+            return
+
         current_config_path = Path(current_config_path)
         current_config_path.verify_is_file()
 
@@ -423,9 +428,14 @@ class auto_context:
         )
         assert isinstance(preferred_config_path, Path)
 
-        if not preferred_config_path.is_file:
-            preferred_config_path.verify_not_exists()
-            current_config_path.copy_to(preferred_config_path)
+        if not overwrite and preferred_config_path.is_file:
+            warnings.warn(("The configuration file %s already exists. If you wish to update it, "
+                           "you must either update the config file manually, or import the module "
+                           "and call %s.main.context.post_install_hook(overwrite=True) to "
+                           "overwrite it.") %
+                          (abs(preferred_config_path), self._name))
+        else:
+            current_config_path.copy_to(preferred_config_path, overwrite)
 
     @property
     def automation_root(self):

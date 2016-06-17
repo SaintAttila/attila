@@ -4,6 +4,7 @@ Installation mechanisms for attila.
 
 import sys
 import traceback
+import warnings
 
 from importlib.machinery import SourceFileLoader
 from functools import partial
@@ -55,10 +56,14 @@ class install(_install):
                 module = SourceFileLoader(package_name, import_path).load_module()
             except Exception:
                 # We couldn't import it, so we definitely can't call the post-install hook.
+                warnings.warn("Unable to load the module to run post-install hooks. Configuration"
+                              "files will have to be copied manually, and functions labeled with "
+                              "the '@post_install' decorator will need to be called manually.")
                 return result
 
             post_installs = {}
 
+            # Make sure we include the attila auto_context post-install hook.
             if (hasattr(module, 'main') and hasattr(module.main, 'context') and
                     hasattr(module.main.context, 'post_install_hook')):
                 post_installs[0] = [module.main.context.post_install_hook]
@@ -76,6 +81,7 @@ class install(_install):
             for index in sorted(post_installs):
                 for hook in post_installs[index]:
                     hook()
+
         except Exception as exc:
             traceback.print_exc()
 
@@ -320,7 +326,8 @@ def setup(*args, **kwargs):
 #     return _setup(*args, **kwargs)
 
 
-# TODO: Add a similar mechanism for pre-uninstall hooks.
+# TODO: Add a similar mechanism for pre-uninstall hooks. (It doesn't appear to be straight forward
+#       when using pip.)
 def post_install(function, index=None):
     """
     A decorator for registering a function to be called immediately after install of the containing

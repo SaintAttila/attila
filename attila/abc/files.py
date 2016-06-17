@@ -1550,6 +1550,16 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
             self.verify_is_file(path)
 
             if destination.exists:
+                # TODO: This check isn't working. I think it's because of Python's support for both
+                #       forward and backward slashes in paths, and also possibly case normalization.
+                #       We really need an is_same_as() method that checks to see if the two paths
+                #       refer to the same file system object in a file system-specific way. This is
+                #       really important, because if this check fails, the source file gets deleted
+                #       because it's also the destination file.
+                if str(abs(Path(path, self))) == str(destination):
+                    # We can't overwrite the file with itself.
+                    raise FileExistsError(destination)
+
                 # It's not a folder, and it's in our way.
                 if not overwrite:
                     if destination.is_dir:
