@@ -501,10 +501,10 @@ class adodb_connection(sql.sql_connection, transactions.transactional_connection
         :return: A ADODBRecordSet instance (for queries) or None.
         """
         results = self._execute_raw(command)[0]
-        if results:
-            return ADODBRecordSet(results)
+        if results is None:
+            return results
         else:
-            return None
+            return ADODBRecordSet(results)
 
     def _call(self, name, *parameters):
         """

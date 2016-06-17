@@ -79,6 +79,8 @@ class progress:
         if count_delta is not None:
             self.update_count_delta = count_delta
         if time_delta is not None:
+            if isinstance(time_delta, int):
+                time_delta = datetime.timedelta(seconds=time_delta)
             self.update_time_delta = time_delta
         if header is not None:
             self.header = header
@@ -131,8 +133,8 @@ class progress:
         seconds_passed = (datetime.datetime.now() - self.started).total_seconds()
 
         # Add 1 to each term to prevent div by zero and still get a meaningful estimate.
-        interval = (seconds_passed + 1) / (self.completed_count + 1)
-        remaining_seconds = (self.total_count - self.completed_count + 1) / interval
+        rate = (seconds_passed + 1) / (self.completed_count + 1)
+        remaining_seconds = (self.total_count - self.completed_count + 1) * rate
         return datetime.timedelta(seconds=remaining_seconds)
 
     def get_projected_completion(self):
