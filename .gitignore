@@ -1,5 +1,6 @@
 # Ignore backup copies of old files.
 bak/
+.bak/
 
 # Ignore Microsoft Office temp files.
 ~$*
