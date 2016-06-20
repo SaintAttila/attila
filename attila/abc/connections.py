@@ -89,6 +89,8 @@ class connection(metaclass=ABCMeta):
             raise ConnectionOpenError("The instance is currently open.")
 
     def __enter__(self):
+        # TODO (Someday): Use a counter to keep track of how deeply nested the context is, and only
+        #                 open/close for the outermost context.
         self.open()
         return self
 

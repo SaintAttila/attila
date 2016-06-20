@@ -214,11 +214,13 @@ class Path(Configurable):
         return str(self) == str(other) and self._connection == other._connection
 
     def __ne__(self, other):
+        # ne = Not Equal
         if not isinstance(other, Path):
             return NotImplemented
         return str(self) != str(other) or self._connection != other._connection
 
     def __lt__(self, other):
+        # Less Than
         if not isinstance(other, Path):
             return NotImplemented
 
@@ -239,6 +241,7 @@ class Path(Configurable):
         return False
 
     def __le__(self, other):
+        # Less than/Equal
         if not isinstance(other, Path):
             return NotImplemented
 
@@ -256,6 +259,7 @@ class Path(Configurable):
         return False
 
     def __gt__(self, other):
+        # Greater Than
         if not isinstance(other, Path):
             return NotImplemented
 
@@ -276,6 +280,7 @@ class Path(Configurable):
         return False
 
     def __ge__(self, other):
+        # Greater than/Equal
         if not isinstance(other, Path):
             return NotImplemented
 
@@ -509,7 +514,7 @@ class Path(Configurable):
         the PATH in Windows, go to Start -> Settings -> Control Panel -> System -> Advanced ->
         Environment Variables, then select PATH in the "System variables" list, and click Edit.)
 
-        :param include_cwd: Whether the current working directory be checked before the PATH.
+        :param include_cwd: Whether the current working directory should be checked before the PATH.
         :return: A Path representing the located object, or None.
         """
         return self._connection.find(self, include_cwd)
@@ -667,13 +672,13 @@ class Path(Configurable):
 
     def remove(self):
         """
-        Remove the folder or file.
+        Remove the folder or file. If it doesn't exist, an error is raised.
         """
         return self._connection.remove(self)
 
     def discard(self):
         """
-        Remove the folder or file.
+        Remove the folder or file. If it doesn't exist, this is a no-op.
         """
         return self._connection.discard(self)
 
@@ -691,6 +696,7 @@ class Path(Configurable):
             perform the operation.
         :return: None
         """
+        # TODO: More documentation (Use cases) particularly for check_only flag
         return self._connection.make_dir(self, overwrite, clear, fill, check_only)
 
     def copy_into(self, destination, overwrite=False, clear=False, fill=True, check_only=None):
@@ -1283,6 +1289,7 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
         with self.open_file(path, encoding=encoding) as file_obj:
             for line in file_obj:
                 line = line.rstrip('\r\n')
+                # Some file systems fail to split lines by form feed character, but they should.
                 for piece in line.split(FORM_FEED_CHAR):
                     yield piece
 
@@ -1296,6 +1303,7 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
         """
         return list(self.read(path, encoding))
 
+    # TODO: Rename *_delimited methods in Path to match the *_rows methods here.
     def read_rows(self, path, delimiter=',', quote='"', encoding=None):
         """
         Return an iterator over the records from the file.
@@ -1437,7 +1445,7 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
 
     def remove(self, path):
         """
-        Remove the folder or file.
+        Remove the folder or file. If it doesn't exist, an error is raised.
 
         :param path: The path to operate on.
         """
@@ -1445,7 +1453,7 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
 
     def discard(self, path):
         """
-        Remove the folder or file.
+        Remove the folder or file. If it doesn't exist, this is a no-op.
 
         :param path: The path to operate on.
         """

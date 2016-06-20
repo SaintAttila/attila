@@ -3,7 +3,7 @@ ADODB database interface for Python
 """
 
 
-# TODO: Map databased to the file system interface. The FS interface already supports row-based
+# TODO: Map database to the file system interface. The FS interface already supports row-based
 #       reading and writing via the read_rows(), load_rows(), and save_rows() methods. However,
 #       those methods expect quotes and delimiters, which aren't required for row-based data stores
 #       like SQL tables. Maybe they can simply ignore their delimiter and quote parameters? The
@@ -91,6 +91,7 @@ class ADODBRecordSet(sql.RecordSet):
         self._com_object = com_object
 
     def _next(self):
+        # It looks dead wrong, but it has to be this way. The COM object's interface is broken.
         if self._com_object.EOF or self._com_object.BOF:
             raise StopIteration()
 
@@ -112,6 +113,7 @@ class ADODBConnector(connections.Connector, configurations.Configurable):
 
     @staticmethod
     def _tokenize(string_value):
+        # TODO: docstring. also, can this be a regex?
         token = ''
         in_braces = False
         for char in string_value:
@@ -140,6 +142,7 @@ class ADODBConnector(connections.Connector, configurations.Configurable):
 
     @classmethod
     def _parse(cls, string_value):
+        # TODO: docstring
         key = None
         equals = False
         value = None

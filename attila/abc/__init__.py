@@ -1,5 +1,7 @@
 """
 Interface definitions for attila.
+
+(ABC = Abstract Base Classes)
 """
 
 
