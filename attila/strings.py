@@ -520,6 +520,7 @@ def split_port(ip_port, default=None):
     return server, port
 
 
+@config_loader('list')
 def to_list_of_strings(items, normalizer=None):
     """
     Convert a parameter value, which may be None, a delimited string, or a sequence of non-delimited
