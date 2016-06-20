@@ -37,20 +37,26 @@ class LogNotifier(Notifier, Configurable):
         verify_type(manager, ConfigManager)
         verify_type(value, str, non_empty=True)
 
-        if '@' in value:
-            name, level = value.split('@')
+        if ':' in value:
+            name_level, msg = value.split(':')
+        else:
+            name_level = value
+            msg = None
+
+        if '@' in name_level:
+            name, level = name_level.split('@')
             if level.isdigit():
                 level = int(level)
             else:
                 level = getattr(logging, level.upper())
                 assert isinstance(level, int)
         else:
-            name = value
+            name = name_level
             level = logging.INFO
 
         logger = logging.getLogger(name)
 
-        return cls(*args, logger=logger, level=level, **kwargs)
+        return cls(*args, logger=logger, level=level, msg=None, **kwargs)
 
     @classmethod
     def load_config_section(cls, manager, section, *args, **kwargs):
@@ -67,6 +73,7 @@ class LogNotifier(Notifier, Configurable):
 
         name = manager.load_option(section, 'Name', str)
         level = manager.load_option(section, 'Level', str, 'INFO')
+        msg = manager.load_option(section, 'Message', str, None)
 
         if level.isdigit():
             level = int(level)
@@ -76,9 +83,9 @@ class LogNotifier(Notifier, Configurable):
 
         logger = logging.getLogger(name)
 
-        return cls(*args, logger=logger, level=level, **kwargs)
+        return cls(*args, logger=logger, level=level, msg=msg, **kwargs)
 
-    def __init__(self, logger, level=None):
+    def __init__(self, logger, level=None, msg=None):
         if isinstance(logger, str):
             verify_type(logger, str, non_empty=True)
             logger = logging.getLogger(logger)
@@ -88,10 +95,13 @@ class LogNotifier(Notifier, Configurable):
             level = logging.INFO
         verify_type(level, int)
 
+        verify_type(msg, str, allow_none=True)
+
         super().__init__()
 
         self._logger = logger
         self._level = level
+        self._msg = msg
 
     @property
     def logger(self):
@@ -103,7 +113,12 @@ class LogNotifier(Notifier, Configurable):
         """The logging level this notifier sends at."""
         return self._level
 
-    def __call__(self, *args, attachments=None, **kwargs):
+    @property
+    def msg(self):
+        """The log message template, if any."""
+        return self._msg
+
+    def __call__(self, msg=None, attachments=None, **kwargs):
         """
         Send a notification on this notifier's channel.
 
@@ -111,6 +126,25 @@ class LogNotifier(Notifier, Configurable):
             supported.)
         :return: None
         """
+        if self._logger.level > self._level:
+            return  # It's a no-op, so skip the time it would take to do arg checking & formatting
         if attachments is not None:
             raise OperationNotSupportedError("File attachments are unsupported.")
-        self._logger.log(self._level, *args, **kwargs)
+
+        # Interpolate keyword arguments
+        if msg is None:
+            if self._msg is None:
+                msg = str(kwargs)
+            else:
+                msg = self._msg % kwargs
+        else:
+            verify_type(msg, str)
+            msg %= kwargs
+
+        # Extract arguments that the logger itself accepts.
+        log_args = {}
+        for name in ('exc_info', 'stack_info', 'extra'):
+            if name in kwargs:
+                log_args[name] = kwargs[name]
+
+        self._logger.log(self._level, msg, **log_args)
