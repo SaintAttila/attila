@@ -234,8 +234,7 @@ def wait_for_keypress():
     """
     Waits for any keypress, checking every tenth of a second.
     """
-    while not msvcrt.kbhit():
-        time.sleep(.1)
+    wait_for(msvcrt.kbhit, interval=.1)
 
 
 # noinspection PyPep8Naming
