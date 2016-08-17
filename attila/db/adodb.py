@@ -35,6 +35,13 @@ __all__ = [
 
 ADODB_CONNECTION_COM_CLASS_NAME = "ADODB.Connection"
 
+DEFAULT_DRIVER = 'SQL Server'
+
+# TODO: Add MySQL and other common and supported driver/dialect pairs.
+DRIVER_DIALECT_MAP = {
+    'sql server': 'T-SQL',
+}
+
 
 class Constants:
     """
@@ -176,7 +183,7 @@ class ADODBConnector(connections.Connector, configurations.Configurable):
 
         # We also want to catch any other, unfamiliar terms.
         for key in parameter_map:
-            if key not in {'server', 'database', 'driver', 'trusted_connection', 'uid'}:
+            if key not in {'server', 'database', 'driver', 'trusted_connection', 'uid', 'dialect'}:
                 raise KeyError("Unrecognized term: " + repr(key))
 
         server = parameter_map['server']
@@ -184,6 +191,7 @@ class ADODBConnector(connections.Connector, configurations.Configurable):
         driver = parameter_map.get('driver')
         trusted = parameter_map.get('trusted_connection')
         user = parameter_map.get('uid')
+        dialect = parameter_map.get('dialect')
 
         if trusted is not None:
             trusted = trusted.lower()
@@ -204,6 +212,7 @@ class ADODBConnector(connections.Connector, configurations.Configurable):
             driver=driver,
             credential=credential,
             trusted=trusted,
+            dialect=dialect,
             **kwargs
         )
 
@@ -225,6 +234,7 @@ class ADODBConnector(connections.Connector, configurations.Configurable):
         database = manager.load_option(section, 'database', str)
         driver = manager.load_option(section, 'driver', str, default=None)
         trusted = manager.load_option(section, 'trusted', 'bool', default=None)
+        dialect = manager.load_option(section, 'dialect', str, default=None)
 
         credential = manager.load_option(section, 'credential',
                                          credentials.Credential,
@@ -241,15 +251,18 @@ class ADODBConnector(connections.Connector, configurations.Configurable):
             driver=driver,
             credential=credential,
             trusted=trusted,
+            dialect=dialect,
             **kwargs
         )
 
-    def __init__(self, server, database, driver=None, credential=None, trusted=None):
+    def __init__(self, server, database, driver=None, credential=None, trusted=None, dialect=None):
         verify_type(server, str, non_empty=True)
         verify_type(database, str, non_empty=True)
+        verify_type(dialect, str, non_empty=True, allow_none=True)
 
-        if driver is not None:
-            verify_type(driver, str, non_empty=True)
+        if driver is None:
+            driver = DEFAULT_DRIVER
+        verify_type(driver, str, non_empty=True)
 
         if credential and not (credential.user and credential.password):
             raise ValueError("Partially defined credential.")
@@ -259,11 +272,14 @@ class ADODBConnector(connections.Connector, configurations.Configurable):
             if trusted and credential:
                 raise ValueError("Connection cannot both be trusted and use credentials.")
 
-        super().__init__(adodb_connection)
+        if not dialect and driver.lower() in DRIVER_DIALECT_MAP:
+            dialect = DRIVER_DIALECT_MAP[dialect.lower()]
+
+        super().__init__(adodb_connection, dialect)
 
         self._server = server
         self._database = database
-        self._driver = driver or 'SQL Server'
+        self._driver = driver
         self._credential = credential if credential else None
         self._trusted = trusted
 
@@ -319,6 +335,8 @@ class ADODBConnector(connections.Connector, configurations.Configurable):
             result += ";Uid={%s};Pwd={%s}" % (user, password)
         if self._trusted is not None:
             result += ";Trusted_Connection=%s" % repr(self._trusted)
+        if self.dialect is not None:
+            result += ";Dialect={%s}" % self.dialect
         return result
 
     def __repr__(self):
@@ -326,7 +344,8 @@ class ADODBConnector(connections.Connector, configurations.Configurable):
         args = [repr(self._server), repr(self._database)]
         for name, value in (('driver', self._driver),
                             ('credential', self._credential),
-                            ('trusted', self._trusted)):
+                            ('trusted', self._trusted),
+                            ('dialect', self.dialect)):
             if value is None or (name == 'driver' and value.lower() == 'sql server'):
                 keyword = True
                 continue

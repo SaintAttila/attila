@@ -100,7 +100,7 @@ class SQLiteConnector(connections.Connector, configurations.Configurable):
             if path.is_dir or (not path.is_file and (path.dir is None or not path.dir.is_dir)):
                 raise InvalidPathError(str(path))
 
-        super().__init__(sqlite_connection)
+        super().__init__(sqlite_connection, 'SQLite')
 
         self._path = path
 
