@@ -638,8 +638,8 @@ class auto_context:
             self._automation_error_notifier(
                 task=self._name,
                 event='exception',
-                user=getpass.getuser(),
                 time=datetime.datetime.now(),
+                user=getpass.getuser(),
                 host=socket.gethostname(),
                 exc_info=(exc_type, exc_val, exc_tb),
                 traceback=traceback_string
