@@ -18,7 +18,7 @@ __all__ = [
 
 class Connector(metaclass=ABCMeta):
     """
-    The Connector class is an abstract base class for new_instance factories. A Connector represents
+    The Connector class is an abstract base class for instance factories. A Connector represents
     a particular collection of resources, often residing on another server.
     """
 
@@ -59,7 +59,7 @@ class connection(metaclass=ABCMeta):
 
     @property
     def is_open(self):
-        """Whether the new_instance is currently open."""
+        """Whether the instance is currently open."""
         return self._is_open
 
     @abstractmethod
@@ -76,14 +76,14 @@ class connection(metaclass=ABCMeta):
 
     def verify_open(self):
         """
-        Raise an exception if the new_instance is not open.
+        Raise an exception if the instance is not open.
         """
         if not self._is_open:
             raise ConnectionNotOpenError("The instance is not currently open.")
 
     def verify_closed(self):
         """
-        Raise an exception if the new_instance is not closed.
+        Raise an exception if the instance is not closed.
         """
         if self.is_open:
             raise ConnectionOpenError("The instance is currently open.")

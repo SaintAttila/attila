@@ -37,7 +37,7 @@ DEFAULT_FTP_PORT = 21
 @url_scheme('ftp')
 class FTPConnector(FSConnector):
     """
-    Stores the FTP new_instance information as a single object which can then be passed around
+    Stores the FTP connection information as a single object which can then be passed around
     instead of using multiple parameters to a function.
     """
 
@@ -169,7 +169,7 @@ class FTPConnector(FSConnector):
 @config_loader
 class ftp_connection(fs_connection):
     """
-    An ftp_connection manages the state for a new_instance to an FTP server, providing a
+    An ftp_connection manages the state for a connection to an FTP server, providing a
     standardized interface for interacting with remote files and directories.
     """
 
@@ -183,8 +183,8 @@ class ftp_connection(fs_connection):
         Create a new ftp_connection instance.
 
         Example:
-            # Get a new_instance to the FTP server.
-            new_instance = ftp_connection(connector)
+            # Get a connection to the FTP server.
+            connection = ftp_connection(connector)
         """
         assert isinstance(connector, FTPConnector)
         super().__init__(connector)
@@ -193,7 +193,7 @@ class ftp_connection(fs_connection):
 
     @property
     def is_open(self):
-        """Whether the FTP new_instance is currently open."""
+        """Whether the FTP connection is currently open."""
         if self._is_open:
             try:
                 self._session.voidcmd('NOOP')
@@ -207,7 +207,7 @@ class ftp_connection(fs_connection):
         return super().is_open
 
     def open(self):
-        """Open the FTP new_instance."""
+        """Open the FTP connection."""
         assert not self.is_open
 
         user, password = self._connector.credential
@@ -218,7 +218,7 @@ class ftp_connection(fs_connection):
         self._session.login(user, password)
 
     def close(self):
-        """Close the FTP new_instance"""
+        """Close the FTP connection"""
         assert self.is_open
 
         # noinspection PyBroadException
@@ -232,7 +232,7 @@ class ftp_connection(fs_connection):
 
     @property
     def cwd(self):
-        """The current working directory of this FTP new_instance."""
+        """The current working directory of this FTP connection."""
         assert self.is_open
         return Path(self._session.pwd(), self)
 

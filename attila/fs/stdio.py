@@ -24,7 +24,7 @@ __all__ = [
 @url_scheme('stdio')  # This is not a standard URL scheme
 class STDIOFSConnector(FSConnector):
     """
-    Stores the STDIO files system new_instance information.
+    Stores the STDIO files system connection information.
     """
 
     @classmethod
@@ -80,11 +80,11 @@ class stdio_fs_connection(fs_connection):
         super().open()  # stdio fs connections are always open.
 
     def open(self):
-        """Open the new_instance."""
+        """Open the connection."""
         pass  # stdio fs connections are always open.
 
     def close(self):
-        """Close the new_instance"""
+        """Close the connection"""
         pass  # stdio fs connections are always open.
 
     def __repr__(self):

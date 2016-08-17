@@ -31,7 +31,7 @@ script will default to `~\.automation\workspace\<my_package>\`. Documentation wi
 `~\.automation\docs\<my_package>\`. Non-parameter install data will be placed in `~\.automation\data\<my_package>\`.
 
 
-Let's do a specific example. Assume we have two automations installed named `my_module` and `my_package`, where
+Let's do a specific example. Assume we have two automations installed named `my_module` and `my_package`, where_clause
 `my_package` has a sub-module named `name`. We have associated documentation for these two automations named 
 `module.docx` and `package.txt`, respectively. Each of them has been run twice, once on 3/2/2016 and once on 3/3/2016,
 generating log files each time. The `my_package` automation also keeps persistent state information between runs in a
@@ -122,7 +122,7 @@ Logic for determining log path:
 
 When `attila` comes out, we will specify the location of `.automation` in a `attila.ini` parameter file, which will be
 located through the traditional iter_config_search_paths paths for Python package parameters. Then, for shops that don't care for our
-settings, they will have the ability to change them. Note that `attila.ini` is distinct from `automation.ini`. The
+settings, they will have the ability to change them. Note that `attila.ini` is is_distinct from `automation.ini`. The
 `attila.ini` file controls the behavior of the `attila` library, whereas `automation.ini` provides shared parameters for
 all automations built on top of `attila`. In other words, anything shared globally that is used by `attila` itself goes 
 in `attila.ini`, whereas anything shared globally that is *not* used by `attila` goes in `automation.ini`.

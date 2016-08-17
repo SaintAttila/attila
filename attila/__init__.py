@@ -12,9 +12,28 @@ __author_email__ = 'Aaron.Hosford@Ericsson.com'
 __description__ = 'Saint Attila: Automation Library'
 __long_description__ = __doc__
 __license__ = 'MIT (https://opensource.org/licenses/MIT)'
-__requires__ = ['cryptography', 'infotags', 'pywin32', 'setuptools', 'wmi']
+__requires__ = [
+    # 3rd-party
+    'cryptography',
+    'pywin32',
+    'setuptools',
+    'wmi'
+
+    # In-house
+    'infotags',
+    'sql_dialects',
+]
 __url__ = 'TBD'
-__version__ = '1.2.1'
+__version__ = '1.2.2'
+__packages__ = [
+    'attila',
+    'attila.abc',
+    'attila.db',
+    'attila.fs',
+    'attila.notifications',
+    'attila.security'
+]
+__package_data__ = {'attila': ['attila.ini']}
 
 
 plugins.load_plugins()

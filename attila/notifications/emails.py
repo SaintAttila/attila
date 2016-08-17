@@ -331,7 +331,7 @@ class EmailConnector(Connector, Configurable):
         return self._use_html
 
     def connect(self, subject_template, body_template, footer=True):
-        """Create a new new_instance and return it. The new_instance is not automatically opened."""
+        """Create a new connection and return it. The connection is not automatically opened."""
         return super().connect(
             subject_template=subject_template,
             body_template=body_template,

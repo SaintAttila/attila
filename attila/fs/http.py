@@ -21,16 +21,11 @@ __all__ = [
 ]
 
 
-# TODO: This doesn't appear to be used. Should it be? If not, remove it.
-# http://msdn.microsoft.com/en-us/library/ie/ms775145(v=vs.85).aspx
-INET_E_DOWNLOAD_FAILURE = 0x800C0008
-
-
 @config_loader
 @url_scheme('http')
 class HTTPFSConnector(FSConnector):
     """
-    Stores the HTTP new_instance information.
+    Stores the HTTP connection information.
     """
 
     @classmethod
@@ -85,11 +80,11 @@ class http_fs_connection(fs_connection):
         super().open()  # http fs connections are always open.
 
     def open(self):
-        """Open the new_instance."""
+        """Open the connection."""
         pass  # http fs connections are always open.
 
     def close(self):
-        """Close the new_instance"""
+        """Close the connection"""
         pass  # http fs connections are always open.
 
     def __repr__(self):
@@ -98,6 +93,7 @@ class http_fs_connection(fs_connection):
     def __eq__(self, other):
         if not isinstance(other, fs_connection):
             return NotImplemented
+        # TODO: What about CWD? Is it even being used?
         return isinstance(other, http_fs_connection)
 
     def open_file(self, path, mode='r', buffering=-1, encoding=None, errors=None, newline=None,
@@ -124,6 +120,7 @@ class http_fs_connection(fs_connection):
         # create a temp file and return it as a proxy.
         temp_path = local_fs_connection.get_temp_file_path(self.name(path))
 
+        # TODO: Can we just use a GET?
         # http://msdn.microsoft.com/en-us/library/ie/ms775123(v=vs.85).aspx
         result = ctypes.windll.urlmon.URLDownloadToFileW(0, path, str(temp_path), 0, 0)
 

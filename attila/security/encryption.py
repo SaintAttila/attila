@@ -17,6 +17,7 @@ import os
 import cryptography.fernet
 
 from ..exceptions import EncryptionError, DecryptionError
+from . import passwords
 
 
 # Make sure our DLLs are available up front. Think of these as similar to
@@ -280,7 +281,7 @@ def encrypt(data, password=None):
     :return: The encrypted data.
     """
 
-    key = get_encryption_key(password or security.passwords.get_master_password())
+    key = get_encryption_key(password or passwords.get_master_password())
     del password
     symmetric_encoding = cryptography.fernet.Fernet(key)
     del key
@@ -300,7 +301,7 @@ def decrypt(data, password=None):
     :return: The decrypted data.
     """
 
-    key = get_encryption_key(password or security.passwords.get_master_password())
+    key = get_encryption_key(password or passwords.get_master_password())
     del password
     symmetric_encoding = cryptography.fernet.Fernet(key)
     del key

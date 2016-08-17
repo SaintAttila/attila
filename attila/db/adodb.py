@@ -12,23 +12,6 @@ ADODB database interface for Python
 #       how complicated is it going to get?
 
 
-# TODO: Create a SQLQueryBuilder base class to allow queries to be built with identical code
-#       regardless of which type of database is being connected to. Something like this:
-#
-#           qb = connection.query_builder
-#           query = qb.select(
-#               'column_1',
-#               'column_2',
-#               column_3='extra_column'
-#           ).from_(
-#               'table_name'
-#           ).where(
-#               qb.column_1 < qb.column_2 &
-#               qb.column_2 == qb.column_3
-#           )
-#           results = query.execute()
-
-
 import win32com.client
 
 
@@ -106,9 +89,9 @@ class ADODBRecordSet(sql.RecordSet):
 @config_loader
 class ADODBConnector(connections.Connector, configurations.Configurable):
     """
-    Stores the ADODB new_instance information for a database as a single object which can then be
+    Stores the ADODB connection information for a database as a single object which can then be
     passed around instead of using multiple parameters to a function. Use str(connector) to get the
-    actual new_instance string.
+    actual connection string.
     """
 
     @staticmethod
@@ -306,20 +289,20 @@ class ADODBConnector(connections.Connector, configurations.Configurable):
 
     @property
     def trusted(self):
-        """Whether the new_instance is "trusted"."""
+        """Whether the connection is "trusted"."""
         return self._trusted
 
     def connect(self, command_timeout=None, connection_timeout=None, auto_reconnect=True,
                 cursor_location=None):
         """
-        Create a new new_instance and return it. The new_instance is not automatically opened.
+        Create a new connection and return it. The connection is not automatically opened.
 
         :param command_timeout: The number of seconds to wait for a command to execute.
-        :param connection_timeout: The number of seconds to wait for a new_instance attempt to
+        :param connection_timeout: The number of seconds to wait for a connection attempt to
             succeed.
-        :param auto_reconnect: Whether to automatically reconnect if the new_instance is broken.
+        :param auto_reconnect: Whether to automatically reconnect if the connection is broken.
         :param cursor_location: The initial cursor location.
-        :return: The new, unopened new_instance.
+        :return: The new, unopened connection.
         """
         return super().connect(
             command_timeout=command_timeout,
@@ -359,7 +342,7 @@ class ADODBConnector(connections.Connector, configurations.Configurable):
 class adodb_connection(sql.sql_connection, transactions.transactional_connection,
                        configurations.Configurable):
     """
-    An adodb_connection manages the state for a new_instance to a SQL server via ADODB, providing an
+    An adodb_connection manages the state for a connection to a SQL server via ADODB, providing an
     interface for executing queries and commands.
     """
 
@@ -403,9 +386,9 @@ class adodb_connection(sql.sql_connection, transactions.transactional_connection
         Create a new adodb_connection instance.
 
         Example:
-            # Get a new_instance to the database with a command timeout of 100 seconds
-            # and a new_instance timeout of 10 seconds.
-            new_instance = adodb_connection(connector, 100, 10)
+            # Get a connection to the database with a command timeout of 100 seconds
+            # and a connection timeout of 10 seconds.
+            connection = adodb_connection(connector, 100, 10)
         """
 
         assert isinstance(connector, ADODBConnector)
@@ -432,11 +415,11 @@ class adodb_connection(sql.sql_connection, transactions.transactional_connection
 
     @property
     def is_open(self):
-        """Whether the new_instance is currently open."""
+        """Whether the connection is currently open."""
         return self._com_object is not None and bool(self._com_object.State & Constants.adStateOpen)
 
     def open(self):
-        """Open the ADODB new_instance."""
+        """Open the ADODB connection."""
         super().open()
 
         # The state may have other bits set, but we only care about the one that indicates whether
@@ -454,7 +437,7 @@ class adodb_connection(sql.sql_connection, transactions.transactional_connection
         self._com_object.Open(str(self._connector))
 
     def close(self):
-        """Close the ADODB new_instance"""
+        """Close the ADODB connection"""
         if self.is_open:
             return self._com_object.Close()
         super().close()
@@ -516,8 +499,8 @@ class adodb_connection(sql.sql_connection, transactions.transactional_connection
         data.
 
         Example:
-            # Execute a stored procedure with 2 parameters from an open new_instance.
-            new_instance.call(stored_procedure_name, year_str, month_str)
+            # Execute a stored procedure with 2 parameters from an open connection.
+            connection.call(stored_procedure_name, year_str, month_str)
 
         :param name: The name of the stored procedure to execute.
         :param parameters: Additional parameters to be passed to the stored procedure.

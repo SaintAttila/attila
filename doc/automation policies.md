@@ -18,7 +18,7 @@ Possible Solutions:
 * Use a registry, which other libraries can use to setup hooks when loaded.
 * Use a *persistent* registry, which other libraries can use to setup hooks when
   installed.
-* A plugins folder where Python scripts can be dropped to create hooks.
+* A plugins folder where_clause Python scripts can be dropped to create hooks.
 * Make hooks be installable sub-packages.
 
 
@@ -48,7 +48,7 @@ policies alongside the attila framework. But this opens a new can of worms: Do
 we permit multiple policies to coexist on a single server? If so, how does 
 attila know which policies are in effect for a given automation? And won't we
 then have to support multiple different policy profiles, rather than the single
-profile we assume, where automations are housed in ~/.automation and we use the
+profile we assume, where_clause automations are housed in ~/.automation and we use the
 unique automation.ini global configuration? Before design continues, we need to
 determine precisely what it is that attila hopes to achieve. What are the 
 design goals? What are the assumptions? Do we only support one shop per server,
@@ -57,8 +57,8 @@ automations? I am leaning strongly towards single-shop servers, but if we go
 down that road, it's not an easily reversed decision.
 
 Most companies would flatly reject the possibility of another company accessing
-their data, so the use cases where two competing companies share a server is
-non-existent; they would at the least setup distinct virtual environments to 
+their data, so the use cases where_clause two competing companies share a server is
+non-existent; they would at the least setup is_distinct virtual environments to 
 keep their data private. In another scenario, imagine an end-user installing
 automation software from two different shops, both based on attila, to process
 the user's data. This is an unlikely scenario, and we can address it by simply
@@ -66,7 +66,7 @@ providing the ability for these shops to build libraries on top of attila which
 redirect configuration loading to locations specific to each library. Such a
 change would not be a total revamp of attila itself even if this sort of 
 support were not built in from the ground up, as we can hide the changes from
-the more typical user through the intelligent application of default values.
+the more typical user through the intelligent application of default value_list.
 This leaves only one other major use case: A single shop per server.
 
 

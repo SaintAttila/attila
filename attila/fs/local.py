@@ -27,7 +27,7 @@ __all__ = [
 @url_scheme('file')
 class LocalFSConnector(FSConnector):
     """
-    Stores the local files system new_instance information.
+    Stores the local files system connection information.
     """
 
     @classmethod
@@ -83,11 +83,11 @@ class local_fs_connection(fs_connection):
         super().open()  # local fs connections are always open.
 
     def open(self):
-        """Open the new_instance."""
+        """Open the connection."""
         pass  # local fs connections are always open.
 
     def close(self):
-        """Close the new_instance"""
+        """Close the connection"""
         pass  # local fs connections are always open.
 
     def __repr__(self):
@@ -110,7 +110,7 @@ class local_fs_connection(fs_connection):
 
     @property
     def cwd(self):
-        """The current working directory of this file system new_instance."""
+        """The current working directory of this file system connection."""
         # TODO: Should we track the CWD separately for each instance? The OS itself only provides
         #       one CWD per process, but for other new_instance types (e.g. FTP) the CWD is a
         #       per-new_instance value, and this might lead to slight incompatibilities between the
@@ -119,7 +119,7 @@ class local_fs_connection(fs_connection):
 
     @cwd.setter
     def cwd(self, path):
-        """The current working directory of this file system new_instance."""
+        """The current working directory of this file system connection."""
         os.chdir(self.check_path(path))
 
     def check_path(self, path, expand_user=True, expand_vars=True):
@@ -311,7 +311,7 @@ class local_fs_connection(fs_connection):
         if pattern == '*':
             return os.listdir(path)
 
-        return [Path(match).name for match in glob.iglob(os.path.join(path, pattern))]
+        return [Path(match, self).name for match in glob.iglob(os.path.join(path, pattern))]
 
     def glob(self, path, pattern='*'):
         """
@@ -323,7 +323,7 @@ class local_fs_connection(fs_connection):
         """
         path = self.check_path(path)
         self.verify_is_dir(path)
-        return [Path(match) for match in glob.iglob(os.path.join(path, pattern))]
+        return [Path(match, self) for match in glob.iglob(os.path.join(path, pattern))]
 
     def open_file(self, path, mode='r', buffering=-1, encoding=None, errors=None, newline=None,
                   closefd=True, opener=None):
@@ -434,6 +434,6 @@ class local_fs_connection(fs_connection):
         """
         path = self.check_path(path)
         if destination.connection == self:
-            shutil.copy2(path, str(destination))
+            shutil.copy2(path, str(abs(destination)))
         else:
             super().raw_copy(path, destination)

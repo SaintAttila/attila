@@ -44,9 +44,9 @@ class SQLiteRecordSet(sql.RecordSet):
 @config_loader
 class SQLiteConnector(connections.Connector, configurations.Configurable):
     """
-    Stores the SQLite new_instance information for a database as a single object which can then be
+    Stores the SQLite connection information for a database as a single object which can then be
     passed around instead of using multiple parameters to a function. Use str(connector) to get the
-    actual new_instance string.
+    actual connection string.
     """
 
     @classmethod
@@ -127,7 +127,7 @@ class SQLiteConnector(connections.Connector, configurations.Configurable):
         self._path = value
 
     def connect(self):
-        """Create a new new_instance and return it. The new_instance is not automatically opened."""
+        """Create a new connection and return it. The connection is not automatically opened."""
         return super().connect()
 
     def __str__(self):
@@ -143,7 +143,7 @@ class SQLiteConnector(connections.Connector, configurations.Configurable):
 # noinspection PyPep8Naming
 class sqlite_connection(sql.sql_connection, transactions.transactional_connection):
     """
-    A sqlite_connection manages the state for a new_instance to a SQLite database, providing an
+    A sqlite_connection manages the state for a connection to a SQLite database, providing an
     interface for executing queries and commands.
     """
 
@@ -152,9 +152,9 @@ class sqlite_connection(sql.sql_connection, transactions.transactional_connectio
         Create a new sqlite_connection instance.
 
         Example:
-            # Get a new_instance to the database with a command timeout of 100 seconds
-            # and a new_instance timeout of 10 seconds.
-            new_instance = sqlite_connection(connector, 100, 10)
+            # Get a connection to the database with a command timeout of 100 seconds
+            # and a connection timeout of 10 seconds.
+            connection = sqlite_connection(connector, 100, 10)
         """
 
         verify_type(connector, SQLiteConnector)
@@ -164,14 +164,14 @@ class sqlite_connection(sql.sql_connection, transactions.transactional_connectio
         self._cursor = None
 
     def open(self):
-        """Open the new_instance."""
+        """Open the connection."""
         self.verify_closed()
         super().open()
         self._connection = sqlite3.connect(str(self._connector))
         self._cursor = self._connection.cursor()
 
     def close(self):
-        """Close the new_instance."""
+        """Close the connection."""
         self.verify_open()
         super().close()
         if self._cursor is not None:
@@ -215,8 +215,8 @@ class sqlite_connection(sql.sql_connection, transactions.transactional_connectio
         data.
 
         Example:
-            # Execute a stored procedure with 2 parameters from an open new_instance.
-            new_instance.call(stored_procedure_name, year_str, month_str)
+            # Execute a stored procedure with 2 parameters from an open connection.
+            connection.call(stored_procedure_name, year_str, month_str)
 
         :param name: The name of the stored procedure to execute.
         :param parameters: Additional parameters to be passed to the stored procedure.
