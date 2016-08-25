@@ -476,7 +476,7 @@ class USDateTimeParser(DateTimeParser):
             '%H%M',
         ]
 
-        formats = date_formats + [date_format + time_format
+        formats = date_formats + [date_format + ' ' + time_format
                                   for date_format in date_formats
                                   for time_format in time_formats]
 
@@ -498,6 +498,22 @@ def parse_datetime(string, parser=None):
         parser = USDateTimeParser()
     verify_type(parser, DateTimeParser)
     return parser.parse(string)
+
+
+@config_loader('date')
+def parse_date(string, parser=None):
+    """
+    Parse a date string, returning a datetime.date instance.
+
+    :param string: The date to be parsed.
+    :param parser: The parser instance to use. By default, this is a USDateTimeParser instance with
+        default settings.
+    :return: A datetime.date instance.
+    """
+    date_and_time = parse_datetime(string, parser)
+    assert date_and_time == date_and_time.replace(hour=0, minute=0, second=0, microsecond=0), \
+        "Expected date; got date/time."
+    return date_and_time.date()
 
 
 def split_port(ip_port, default=None):
