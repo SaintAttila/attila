@@ -17,6 +17,7 @@ from ..abc.sql import SQLConnector, sql_connection
 from ..configurations import ConfigManager
 from ..exceptions import OperationNotSupportedError, verify_type
 from ..plugins import config_loader
+from .. import strings
 
 
 __author__ = 'Aaron Hosford'
@@ -41,22 +42,23 @@ def _string_parser(string):
 
 def _null_parser(string):
     string = string.lower()
-    assert string in ('', 'null', 'none')
+    assert string in ('', 'null', 'none', 'nil')
     return None
 
 
 # TODO: Can we do away with this and just use the config manager to load & parse them?
 TYPE_PARSER_MAP = {
-    LiteralTypes.DATE: lambda string: datetime.datetime.strptime(string, STANDARD_DATE_FORMAT).date(),
-    LiteralTypes.DATE_TIME: lambda string: datetime.datetime.strptime(string, STANDARD_DATETIME_FORMAT),
+    LiteralTypes.DATE: strings.parse_date,
+    LiteralTypes.DATE_TIME: strings.parse_datetime,
     LiteralTypes.FLOAT: decimal.Decimal,
+    LiteralTypes.BOOLEAN: strings.parse_bool,
     LiteralTypes.INTEGER: int,
     LiteralTypes.NULL: _null_parser,
     LiteralTypes.STRING: _string_parser,
 }
 
-
 TYPE_MAP = {
+    'bool': LiteralTypes.BOOLEAN,
     'date': LiteralTypes.DATE,
     'date/time': LiteralTypes.DATE_TIME,
     'datetime': LiteralTypes.DATE_TIME,
