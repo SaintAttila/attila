@@ -136,10 +136,10 @@ class LogNotifier(Notifier, Configurable):
             if self._msg is None:
                 msg = str(kwargs)
             else:
-                msg = self._msg % kwargs
+                msg = self._msg.format_map(kwargs)
         else:
             verify_type(msg, str)
-            msg %= kwargs
+            msg.format_map(kwargs)
 
         # Extract arguments that the logger itself accepts.
         log_args = {}
