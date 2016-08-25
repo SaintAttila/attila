@@ -15,7 +15,6 @@ ADODB database interface for Python
 import win32com.client
 
 
-from ..abc import connections
 from ..abc import configurations
 from ..abc import sql
 from ..abc import transactions
@@ -94,7 +93,7 @@ class ADODBRecordSet(sql.RecordSet):
 
 
 @config_loader
-class ADODBConnector(connections.Connector, configurations.Configurable):
+class ADODBConnector(sql.SQLConnector, configurations.Configurable):
     """
     Stores the ADODB connection information for a database as a single object which can then be
     passed around instead of using multiple parameters to a function. Use str(connector) to get the
@@ -273,7 +272,7 @@ class ADODBConnector(connections.Connector, configurations.Configurable):
                 raise ValueError("Connection cannot both be trusted and use credentials.")
 
         if not dialect and driver.lower() in DRIVER_DIALECT_MAP:
-            dialect = DRIVER_DIALECT_MAP[dialect.lower()]
+            dialect = DRIVER_DIALECT_MAP[driver.lower()]
 
         super().__init__(adodb_connection, dialect)
 

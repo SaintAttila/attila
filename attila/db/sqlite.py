@@ -6,7 +6,6 @@ SQLite database interface for Python
 import sqlite3
 
 
-from ..abc import connections
 from ..abc import configurations
 from ..abc import sql
 from ..abc import transactions
@@ -42,7 +41,7 @@ class SQLiteRecordSet(sql.RecordSet):
 
 
 @config_loader
-class SQLiteConnector(connections.Connector, configurations.Configurable):
+class SQLiteConnector(sql.SQLConnector, configurations.Configurable):
     """
     Stores the SQLite connection information for a database as a single object which can then be
     passed around instead of using multiple parameters to a function. Use str(connector) to get the
