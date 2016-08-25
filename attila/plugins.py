@@ -218,6 +218,10 @@ def config_loader(name=NotImplemented, value=NotImplemented):
         class LessAptlyNamedConfigLoader(attila.abc.configurations.Configurable):
             ...
 
+    IMPORTANT NOTE: If you use this decorator, but your configuration loader
+    isn't available, check to make sure the module you used it in has been
+    imported; the decorator has to be executed as a statement before it takes
+    effect.
 
     :param name: The name to register the plugin under.
     :param value: The value to register as a plugin.
