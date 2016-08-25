@@ -111,14 +111,17 @@ class sql_connection(rpc.rpc_connection, metaclass=ABCMeta):
         """
         self.verify_open()
 
-        if isinstance(script, sql_dialects.ast.SQLExpression):
+        if isinstance(script, sql_dialects.ast.SQLCommand):
             try:
-                script = sql_dialects.dialects.get_dialect(self._connector.dialect)
+                dialect = sql_dialects.dialects.get_dialect(self._connector.dialect)
             except KeyError as exc:
                 if self._connector.dialect is None:
                     raise KeyError("SQL builder used with no default dialect set.") from exc
                 else:
                     raise KeyError("SQL builder used with unsupported dialect: %s" % self._connector.dialect) from exc
+            script = script.compile(dialect)
+
+        verify_type(script, str, non_empty=True)
 
         result = self._execute(script)
         assert result is None or isinstance(result, RecordSet)
