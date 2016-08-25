@@ -12,8 +12,7 @@ from ..configurations import ConfigManager, INTERPOLATION_ESCAPE, INTERPOLATION_
     INTERPOLATION_CLOSE
 from ..exceptions import verify_type
 from ..plugins import config_loader
-from . import encryption
-from . import passwords
+from . import encryption, passwords
 
 
 __author__ = 'Aaron Hosford'

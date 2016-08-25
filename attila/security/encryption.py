@@ -17,7 +17,6 @@ import os
 import cryptography.fernet
 
 from ..exceptions import EncryptionError, DecryptionError
-from . import passwords
 
 
 # Make sure our DLLs are available up front. Think of these as similar to
@@ -281,7 +280,10 @@ def encrypt(data, password=None):
     :return: The encrypted data.
     """
 
-    key = get_encryption_key(password or passwords.get_master_password())
+    # This must be done here, and not at the module level, or we will get an import cycle.
+    from attila.security.passwords import get_master_password
+
+    key = get_encryption_key(password or get_master_password())
     del password
     symmetric_encoding = cryptography.fernet.Fernet(key)
     del key
@@ -301,7 +303,10 @@ def decrypt(data, password=None):
     :return: The decrypted data.
     """
 
-    key = get_encryption_key(password or passwords.get_master_password())
+    # This must be done here, and not at the module level, or we will get an import cycle.
+    from attila.security.passwords import get_master_password
+
+    key = get_encryption_key(password or get_master_password())
     del password
     symmetric_encoding = cryptography.fernet.Fernet(key)
     del key
