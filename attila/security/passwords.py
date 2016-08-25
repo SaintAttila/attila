@@ -16,7 +16,10 @@ import os
 import cryptography.fernet
 
 
-from ..abc.connections import Connector
+from sql_dialects import T, F, V
+
+
+from ..abc.sql import SQLConnector, sql_connection
 from ..abc.files import Path
 from ..exceptions import BadPasswordError, PasswordRequiredError
 from .. import configurations
@@ -60,11 +63,11 @@ def get_password_database_connector():
     Get the connector to the password database.
 
     :return: The connector for the password database.
-    :rtype: attila.abc.connections.Connector
+    :rtype: attila.abc.sql.SQLConnector
     """
     config_loader = configurations.get_automation_config_manager()
     connector = config_loader.load_option('Security', 'Password DB Connector')
-    assert isinstance(connector, Connector)
+    assert isinstance(connector, SQLConnector)
     return connector
 
 
@@ -187,10 +190,13 @@ def get_domains():
     :return: A set containing the domain names.
     """
 
+    # "SELECT DISTINCT System FROM AutomationPasswords"
+    query = T.AutomationPasswords.select(F.System).distinct()
+
     # Query the DB for the username.
     with get_password_database_connector().connect() as connection:
-        # noinspection SqlDialectInspection,SqlNoDataSourceInspection
-        results = connection.Execute("SELECT DISTINCT System FROM AutomationPasswords")
+        assert isinstance(connection, sql_connection)
+        results = connection.execute(query)
         return {row[0] for row in results}
 
 
@@ -206,13 +212,17 @@ def get_users(domain, valid=True):
     :return: The user names.
     """
 
+    # "SELECT UserName FROM AutomationPasswords WHERE System = '" +
+    # domain + "' AND Valid = " + str(int(valid))
+    query = T.AutomationPasswords.select(F.UserName).where(
+        F.System == V(domain) &
+        F.Valid == V(valid)
+    )
+
     # Query the DB for the username.
     with get_password_database_connector().connect() as connection:
-        # noinspection SqlDialectInspection,SqlNoDataSourceInspection
-        results = connection.Execute(
-            "SELECT UserName FROM AutomationPasswords WHERE System = '" +
-            domain + "' AND Valid = " + str(int(valid))
-        )
+        assert isinstance(connection, sql_connection)
+        results = connection.execute(query)
         return {row[0] for row in results}
 
 
@@ -245,31 +255,41 @@ def set_password(domain, user, password, valid=True, refresh_master=True):
 
     encrypted_password = encryption.from_bytes(base64.b64encode(encrypted_password))
 
-    # Write the username/password to the DB.
-    with get_password_database_connector().connect() as connection:
-        # noinspection SqlDialectInspection,SqlNoDataSourceInspection
-        results = list(
-            connection.Execute(
-                "SELECT Password FROM AutomationPasswords WHERE System = '" +
-                domain + "' AND UserName = '" + user + "'"
-            )
+    # "SELECT Password FROM AutomationPasswords WHERE System = '" +
+    # domain + "' AND UserName = '" + user + "'"
+    list_query = T.AutomationPasswords.select(F.Password).where(
+        (F.System == V(domain)) &
+        (F.UserName == V(user))
+    )
+
+    # "UPDATE AutomationPasswords SET Password = '" +
+    # encrypted_password + "', Valid = " + str(int(valid)) +
+    # " WHERE System = '" + domain + "' AND UserName = '" +
+    # user + "'"
+    update_query = T.AutomationPasswords.update().\
+        set(F.Password, V(encrypted_password)).\
+        set(F.Valid, V(valid)).\
+        where(
+            (F.System == V(domain)) &
+            (F.UserName == V(user))
         )
 
-        if results:
-            # noinspection SqlDialectInspection,SqlNoDataSourceInspection
-            connection.Execute(
-                "UPDATE AutomationPasswords SET Password = '" +
-                encrypted_password + "', Valid = " + str(int(valid)) +
-                " WHERE System = '" + domain + "' AND UserName = '" +
-                user + "'"
-            )
+    # "INSERT INTO AutomationPasswords VALUES('" + domain + "', '" +
+    # user + "', '" + encrypted_password + "', " +
+    # str(int(valid)) + ")"
+    insert_query = T.AutomationPasswords.insert().\
+        set(F.System, V(domain)).\
+        set(F.UserName, V(user)).\
+        set(F.Password, V(encrypted_password)).\
+        set(F.Valid, V(valid))
+
+    # Write the username/password to the DB.
+    with get_password_database_connector().connect() as connection:
+        assert isinstance(connection, sql_connection)
+        if list(connection.execute(list_query)):
+            connection.execute(update_query)
         else:
-            # noinspection SqlDialectInspection,SqlNoDataSourceInspection
-            connection.Execute(
-                "INSERT INTO AutomationPasswords VALUES('" + domain + "', '" +
-                user + "', '" + encrypted_password + "', " +
-                str(int(valid)) + ")"
-            )
+            connection.execute(insert_query)
 
 
 def get_password(domain, user, refresh_master=True):
@@ -283,13 +303,17 @@ def get_password(domain, user, refresh_master=True):
     :return: The password for the user name.
     """
 
+    # "SELECT Password FROM AutomationPasswords WHERE System = '" +
+    # domain + "' AND UserName = '" + user + "' AND Valid = 1"
+    query = T.AutomationPasswords.select(F.Password).where(
+        (F.System == V(domain)) &
+        (F.UserName == V(user)) &
+        (F.Valid == V(True))
+    )
+
     # Query the DB for the username's password.
     with get_password_database_connector().connect() as connection:
-        # noinspection SqlDialectInspection,SqlNoDataSourceInspection
-        results = connection.execute(
-            "SELECT Password FROM AutomationPasswords WHERE System = '" +
-            domain + "' AND UserName = '" + user + "' AND Valid = 1"
-        )
+        results = connection.execute(query)
         for row in results:
             encrypted_password = base64.b64decode(row[0])
             break
@@ -315,13 +339,17 @@ def invalidate_password(domain, user):
     :param user: The user name on the domain.
     """
 
+    # "UPDATE AutomationPasswords SET Valid = 0 WHERE System = '" +
+    # domain + "' AND UserName = '" + user + "'"
+    query = T.AutomationPasswords.update().set(F.Valid, V(False)).where(
+        (F.System == V(domain)) &
+        (F.UserName == V(user))
+    )
+
     # Set the valid password flag to false in the DB.
     with get_password_database_connector().connect() as connection:
-        # noinspection SqlDialectInspection,SqlNoDataSourceInspection
-        connection.Execute(
-            "UPDATE AutomationPasswords SET Valid = 0 WHERE System = '" +
-            domain + "' AND UserName = '" + user + "'"
-        )
+        assert isinstance(connection, sql_connection)
+        connection.execute(query)
 
 
 def remove_user(domain, user):
@@ -332,13 +360,17 @@ def remove_user(domain, user):
     :param user: The user name on the domain.
     """
 
+    # "DELETE FROM AutomationPasswords WHERE System = '" + domain +
+    # "' AND UserName = '" + user + "'"
+    query = T.AutomationPasswords.delete().where(
+        (F.System == V(domain)) &
+        (F.UserName == V(user))
+    )
+
     # Delete the username/password from the DB.
     with get_password_database_connector().connect() as connection:
-        # noinspection SqlDialectInspection,SqlNoDataSourceInspection
-        connection.Execute(
-            "DELETE FROM AutomationPasswords WHERE System = '" + domain +
-            "' AND UserName = '" + user + "'"
-        )
+        assert isinstance(connection, sql_connection)
+        connection.execute(query)
 
 
 def update_master_password():
