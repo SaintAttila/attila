@@ -24,7 +24,7 @@ __requires__ = [
     'sql_dialects',
 ]
 __url__ = 'TBD'
-__version__ = '1.2.2'
+__version__ = '1.3'
 __packages__ = [
     'attila',
     'attila.abc',
