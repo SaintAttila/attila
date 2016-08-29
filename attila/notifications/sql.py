@@ -163,6 +163,8 @@ class SQLNotifier(Notifier, Configurable):
             connection = connector.connect()
         verify_type(connection, sql_connection)
 
+        keep_open = manager.load_option(section, 'Keep Open', 'bool', True)
+
         # TODO: Support stored procedures?
         command_type = manager.load_option(section, 'Command Type', str)
         if command_type:
@@ -189,13 +191,15 @@ class SQLNotifier(Notifier, Configurable):
             table=table,
             fields=field_list,
             command_type=command_type,
+            keep_open=keep_open,
             **kwargs
         )
 
-    def __init__(self, connection, table, fields, command_type=None):
+    def __init__(self, connection, table, fields, command_type=None, keep_open=True):
         verify_type(connection, sql_connection)
         verify_type(command_type, str, non_empty=True, allow_none=True)
         verify_type(table, str, non_empty=True)
+        verify_type(keep_open, bool)
 
         if command_type is None:
             command_type = 'INSERT'
@@ -221,6 +225,11 @@ class SQLNotifier(Notifier, Configurable):
         self._table = table
         self._fields = tuple(entries)
         self._command_type = command_type
+        self._keep_open = keep_open
+
+    def __del__(self):
+        if self._connection.is_open:
+            self._connection.close()
 
     def __call__(self, msg=None, attachments=None, **kwargs):
         """
@@ -251,4 +260,10 @@ class SQLNotifier(Notifier, Configurable):
                 value = parser(value_str)
             command = command.set(**{field_name: V(value, sql_type)})
 
-        self._connection.execute(command)
+        if self._keep_open:
+            if not self._connection.is_open:
+                self._connection.open()
+            self._connection.execute(command)
+        else:
+            with self._connection:
+                self._connection.execute(command)
