@@ -3,7 +3,6 @@ Bindings for sending notifications to Python logger objects.
 """
 
 import ast
-import datetime
 import decimal
 
 
