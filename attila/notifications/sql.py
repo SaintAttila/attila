@@ -35,7 +35,7 @@ def _string_parser(string):
         result = ast.literal_eval(string)
         if isinstance(result, str):
             return result
-    except ValueError:
+    except (ValueError, SyntaxError):
         pass
     return string
 
