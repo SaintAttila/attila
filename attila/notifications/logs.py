@@ -38,7 +38,9 @@ class LogNotifier(Notifier, Configurable):
         verify_type(value, str, non_empty=True)
 
         if ':' in value:
-            name_level, msg = value.split(':')
+            index = value.index(':')
+            name_level = value[:index]
+            msg = value[index + 1:]
         else:
             name_level = value
             msg = None
@@ -54,9 +56,12 @@ class LogNotifier(Notifier, Configurable):
             name = name_level
             level = logging.INFO
 
-        logger = logging.getLogger(name)
+        if not name or name.lower() == 'root':
+            logger = logging.root
+        else:
+            logger = logging.getLogger(name)
 
-        return cls(*args, logger=logger, level=level, msg=None, **kwargs)
+        return cls(*args, logger=logger, level=level, msg=msg, **kwargs)
 
     @classmethod
     def load_config_section(cls, manager, section, *args, **kwargs):
@@ -81,7 +86,14 @@ class LogNotifier(Notifier, Configurable):
             level = getattr(logging, level.upper())
             assert isinstance(level, int)
 
-        logger = logging.getLogger(name)
+        if not name or name.lower() == 'root':
+            logger = logging.root
+        else:
+            logger = logging.getLogger(name)
+
+        # TODO: Provide a means for configuring the logger here and in
+        #       the method above, too. Right now, the log isn't getting
+        #       configured and so the messages just go nowhere.
 
         return cls(*args, logger=logger, level=level, msg=msg, **kwargs)
 
