@@ -379,13 +379,13 @@ class DateTimeParser(Configurable):
         ambiguous = False
         for datetime_format in self.formats:
             try:
-                candidate = time.strptime(string, datetime_format)
+                candidate = datetime.datetime.strptime(string, datetime_format)
 
                 # Ignore candidates with a year too far from our own. This cuts down on cases where
                 # a bizarrely incorrect date would result from mistaking a day + month as a year.
                 # For example, Nov. 1, 2012, expressed in %d%m%Y format, is 11012012, which can be
                 # read by format %Y%d%m as Dec. 1, 1101.
-                if self.min_year <= candidate <= self.max_year:
+                if not self.min_year <= candidate.year <= self.max_year:
                     continue
 
                 if timestamp is not None and candidate != timestamp:
@@ -406,7 +406,7 @@ class DateTimeParser(Configurable):
         if timestamp is None:
             raise ValueError("Invalid date/time string: " + repr(string)) from error
 
-        return datetime.datetime.fromtimestamp(timestamp)
+        return timestamp
 
 
 @config_loader
@@ -460,16 +460,17 @@ class USDateTimeParser(DateTimeParser):
             '%m/%d/%Y',
             '%Y-%m-%d',
             '%m-%d-%Y',
-            '%Y.%m.%d'
+            '%Y.%m.%d',
             '%m.%d.%Y',
             '%Y%m%d',
             '%m%d%Y',
         ]
         if two_digit_year:
-            date_formats += [date_format.replace('%Y', '%y') for date_format in date_formats]
+            date_formats.extend(date_format.replace('%Y', '%y') for date_format in date_formats)
 
         time_formats = [
             '%H:%M:%S',
+            '%H:%M:%S.%f',
             '%H:%M',
             '%I:%M%p',
             '%I:%M %p',
