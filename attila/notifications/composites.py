@@ -59,6 +59,7 @@ class CompositeNotifier(Notifier, Configurable):
             stop_on_success=False,
             propagate_errors=True,
             error_notifier=None,
+            print_uncaught=True,
             **kwargs
         )
 
@@ -93,9 +94,10 @@ class CompositeNotifier(Notifier, Configurable):
         for notifier in notifiers:
             verify_type(notifier, Notifier)
 
-        stop_on_error = manager.load_option(section, 'Stop On Error', bool, default=False)
-        stop_on_success = manager.load_option(section, 'Stop On Success', bool, default=False)
-        propagate_errors = manager.load_option(section, 'Propagate Errors', bool, default=True)
+        stop_on_error = manager.load_option(section, 'Stop On Error', 'bool', default=False)
+        stop_on_success = manager.load_option(section, 'Stop On Success', 'bool', default=False)
+        propagate_errors = manager.load_option(section, 'Propagate Errors', 'bool', default=True)
+        print_uncaught = manager.load_option(section, 'Print Uncaught Errors', 'bool', default=True)
 
         error_notifier = manager.load_option(section, 'Error Notifier', default=None)
         verify_type(error_notifier, Notifier, allow_none=True)
@@ -107,11 +109,12 @@ class CompositeNotifier(Notifier, Configurable):
             stop_on_success=stop_on_success,
             propagate_errors=propagate_errors,
             error_notifier=error_notifier,
+            print_uncaught=print_uncaught,
             **kwargs
         )
 
     def __init__(self, notifiers, stop_on_error=False, stop_on_success=False, propagate_errors=True,
-                 error_notifier=None):
+                 error_notifier=None, print_uncaught=True):
         notifiers = tuple(notifiers)
         for notifier in notifiers:
             verify_type(notifier, Notifier)
@@ -128,6 +131,7 @@ class CompositeNotifier(Notifier, Configurable):
         self._stop_on_success = stop_on_success
         self._propagate_errors = propagate_errors
         self._error_notifier = error_notifier
+        self._print_uncaught = print_uncaught
 
     @property
     def notifiers(self):
@@ -161,6 +165,10 @@ class CompositeNotifier(Notifier, Configurable):
         """
         return self._error_notifier
 
+    @property
+    def print_uncaught(self):
+        return self._print_uncaught
+
     def __call__(self, *args, **kwargs):
         """
         Send a notification on this notifier's channel.
@@ -176,6 +184,8 @@ class CompositeNotifier(Notifier, Configurable):
             except Exception as exc:
                 if first_exc is None and self._propagate_errors:
                     first_exc = exc
+                if self._print_uncaught:
+                    traceback.print_exc()
                 if self._error_notifier is not None:
                     # noinspection PyBroadException
                     try:
