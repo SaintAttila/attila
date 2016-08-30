@@ -12,6 +12,7 @@ from ..abc.notifications import Notifier
 
 from ..configurations import ConfigManager
 from ..exceptions import verify_type
+from ..notifications.parameters import notification_parameters, EXCEPTION_EVENT
 from ..plugins import config_loader
 from ..strings import to_list_of_strings
 
@@ -190,10 +191,12 @@ class CompositeNotifier(Notifier, Configurable):
                     # noinspection PyBroadException
                     try:
                         self._error_notifier(
-                            args=args,
-                            kwargs=kwargs,
-                            exc_info=sys.exc_info(),
-                            traceback=traceback.format_exc()
+                            **notification_parameters(
+                                EXCEPTION_EVENT,
+                                args=args,
+                                kwargs=kwargs,
+                                exc_info=sys.exc_info()
+                            )
                         )
                     except Exception:
                         # noinspection PyBroadException

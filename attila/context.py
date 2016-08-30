@@ -17,6 +17,8 @@ from .abc.files import Path
 from .configurations import get_automation_config_manager, ConfigManager, iter_config_search_paths
 from .exceptions import verify_type, verify_callable
 from .logging import Logger
+from .notifications.parameters import notification_parameters, SUCCESS_EVENT, FAILURE_EVENT, START_EVENT, END_EVENT, \
+    EXCEPTION_EVENT
 from .utility import last
 
 __author__ = 'Aaron Hosford'
@@ -26,6 +28,26 @@ __all__ = [
     'automation',
     'auto_context',
 ]
+
+
+def _get_entry_point_stack_frame():
+    # My apologies in advance for what you are about to witness here...
+    frame = inspect.currentframe()
+    result = None
+    while frame:
+        f_code = getattr(frame, 'f_code', None)
+        if f_code:
+            co_filename = getattr(f_code, 'co_filename', None)
+            if co_filename:
+                module_name = inspect.getmodulename(co_filename)
+                if module_name == '__init__':
+                    module_name = os.path.basename(os.path.dirname(co_filename))
+                if module_name:
+                    result = frame
+            if getattr(f_code, 'co_name', None) == '<module>':
+                break  # Anything after this point is just bootstrapping code and should be ignored.
+        frame = getattr(frame, 'f_back', None)
+    return result
 
 
 def get_entry_point_name(default=None, use_context=True):
@@ -45,26 +67,53 @@ def get_entry_point_name(default=None, use_context=True):
         current_context = auto_context.current()
         if current_context is not None:
             assert isinstance(current_context, auto_context)
-            if current_context.name:
+            if current_context.name and current_context.name != 'UNKNOWN':
                 return current_context.name
 
-    # My apologies in advance for what you are about to witness here...
-    frame = inspect.currentframe()
-    result = default
-    while frame:
-        f_code = getattr(frame, 'f_code', None)
-        if f_code:
-            co_filename = getattr(f_code, 'co_filename', None)
-            if co_filename:
-                module_name = inspect.getmodulename(co_filename)
-                if module_name == '__init__':
-                    module_name = os.path.basename(os.path.dirname(co_filename))
-                if module_name:
-                    result = module_name
-            if getattr(f_code, 'co_name', None) == '<module>':
-                break  # Anything after this point is just bootstrapping code and should be ignored.
-        frame = getattr(frame, 'f_back', None)
-    return result
+    frame = _get_entry_point_stack_frame()
+
+    if frame is not None:
+        co_filename = frame.f_code
+
+        module_name = inspect.getmodulename(co_filename)
+        if module_name == '__init__':
+            module_name = os.path.basename(os.path.dirname(co_filename))
+        if module_name:
+            return module_name
+
+    return default
+
+
+def get_entry_point_version(default=None, use_context=True):
+    """
+    Locate the module closest to where execution began and return its version number. If no module
+    could be identified (which can sometimes occur when running from some IDEs when a module is run
+    without being saved first), returns default.
+
+    :param default: The default return value if no module could be identified.
+    :param use_context: Whether to use the current automation context, if one is available.
+    :return: The version number string of the identified module, or the default value.
+    """
+
+    if use_context:
+        # First, check to see if we have an automation context; this will be the most reliable means
+        # of determining the correct name, if it is available.
+        current_context = auto_context.current()
+        if current_context is not None:
+            assert isinstance(current_context, auto_context)
+            if current_context.version is not None:
+                return current_context.version
+
+    frame = _get_entry_point_stack_frame()
+
+    if frame is not None:
+        globals_dict = frame.f_globals
+
+        for attribute in ('__version__', 'version'):
+            if attribute in globals_dict:
+                return globals_dict[attribute]
+
+    return default
 
 
 class task:
@@ -177,10 +226,11 @@ class task:
         self._message = message
         if self.success_notifier is not None:
             self.success_notifier(
-                task=self.description,
-                event='success',
-                time=datetime.datetime.now(),
-                message=message
+                **notification_parameters(
+                    SUCCESS_EVENT,
+                    self._description,
+                    message
+                )
             )
 
     def failure(self, message=None):
@@ -193,19 +243,22 @@ class task:
         self._message = message
         if self.failure_notifier is not None:
             self.failure_notifier(
-                task=self.description,
-                event='failure',
-                time=self._ended,
-                message=message
+                **notification_parameters(
+                    FAILURE_EVENT,
+                    self._description,
+                    message
+                )
             )
 
     def __enter__(self):
         self._started = datetime.datetime.now()
         if self.start_notifier is not None:
             self.start_notifier(
-                task=self.description,
-                event='start',
-                time=self._started
+                **notification_parameters(
+                    START_EVENT,
+                    self._description,
+                    time=self._started
+                )
             )
         return self
 
@@ -214,10 +267,12 @@ class task:
         exception_occurred = exc_type or exc_val or exc_tb
         if self.error_notifier is not None and exception_occurred:
             self.error_notifier(
-                task=self.description,
-                event='exception',
-                time=self._ended,
-                exc_info=(exc_type, exc_val, exc_tb)
+                **notification_parameters(
+                    EXCEPTION_EVENT,
+                    self._description,
+                    exc_info=(exc_type, exc_val, exc_tb),
+                    time=self._ended
+                )
             )
         if self._successful is None:
             if exception_occurred:
@@ -226,9 +281,11 @@ class task:
                 self.success()
         if self.end_notifier is not None:
             self.end_notifier(
-                task=self.description,
-                event='end',
-                time=self._ended
+                **notification_parameters(
+                    END_EVENT,
+                    self._description,
+                    time=self._ended
+                )
             )
         return False  # Indicates exceptions should NOT be suppressed.
 
@@ -264,7 +321,7 @@ class auto_context:
             return stack[-1]
         return default
 
-    def __init__(self, name=None, manager=None, start_time=None):
+    def __init__(self, name=None, version=None, manager=None, start_time=None):
         if start_time is None:
             start_time = datetime.datetime.now()
         verify_type(start_time, datetime.datetime)
@@ -272,6 +329,9 @@ class auto_context:
         if not name:
             name = get_entry_point_name('UNKNOWN')
         verify_type(name, str, non_empty=True)
+
+        if not version:
+            version = get_entry_point_version()
 
         shared_manager = get_automation_config_manager()
         fallbacks = [shared_manager]
@@ -319,26 +379,6 @@ class auto_context:
                 logger = manager.load_section(logger_name, Logger)
                 verify_type(logger, logging.Logger)
 
-        # log_file_name_template = manager.load_option(
-        #     'Environment',
-        #     'Log File Name Template',
-        #     str,
-        #     default='%Y%m%d%H%M%S.log'
-        # )
-        # log_entry_format = manager.load('Environment', 'Log Entry Format', str,
-        #                                 default='%(asctime)s_pid:%(process)d ~*~ %(message)s')
-        # log_level = manager.load('Environment', 'Log Level', str,
-        #                          default='INFO')
-        #
-        # log_file_name = start_time.strftime(log_file_name_template)
-        # log_file_path = log_dir[log_file_name]
-        #
-        # if log_level.isdigit():
-        #     log_level = int(log_level)
-        # else:
-        #     log_level = getattr(logging, log_level.upper())
-        # verify_type(log_level, int)
-
         # Start of automation
         automation_start_notifier = manager.load_option('Environment', 'On Automation Start', default=None)
         verify_callable(automation_start_notifier, allow_none=True)
@@ -374,6 +414,7 @@ class auto_context:
         self._automation_root = automation_root
 
         self._name = name
+        self._version = version
         self._manager = manager
         self._start_time = start_time
 
@@ -454,6 +495,15 @@ class auto_context:
         :return: A non-empty str instance.
         """
         return self._name
+
+    @property
+    def version(self):
+        """
+        The version of the automation.
+
+        :return: A non-empty str instance, or None.
+        """
+        return self._version
 
     @property
     def manager(self):
@@ -614,13 +664,10 @@ class auto_context:
         self._get_stack().append(self)
         if self._automation_start_notifier is not None:
             self._automation_start_notifier(
-                task=self._name,
-                event='start',
-                time=self._start_time,
-                user=getpass.getuser(),
-                host=socket.gethostname(),
-                exc_info=(None, None, None),
-                traceback=None
+                **notification_parameters(
+                    START_EVENT,
+                    time=self._start_time
+                )
             )
         return self
 
@@ -636,25 +683,14 @@ class auto_context:
             #       only be done for emails, not for database, log, or other impersonal reporting,
             #       so I suspect it will need to be done at the notifier level, not here.
             self._automation_error_notifier(
-                task=self._name,
-                event='exception',
-                time=datetime.datetime.now(),
-                user=getpass.getuser(),
-                host=socket.gethostname(),
-                exc_info=(exc_type, exc_val, exc_tb),
-                traceback=traceback_string
+                **notification_parameters(
+                    EXCEPTION_EVENT,
+                    exc_info=(exc_type, exc_val, exc_tb)
+                )
             )
 
         if self._automation_end_notifier is not None:
-            self._automation_end_notifier(
-                task=self._name,
-                event='end',
-                time=datetime.datetime.now(),
-                user=getpass.getuser(),
-                host=socket.gethostname(),
-                exc_info=(exc_type, exc_val, exc_tb),
-                traceback=traceback_string
-            )
+            self._automation_end_notifier(**notification_parameters(END_EVENT))
 
         self._get_stack().pop()
         return False  # Do not suppress exceptions.
