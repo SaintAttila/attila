@@ -430,11 +430,8 @@ class ConfigManager:
             results = {}
             for fallback in reversed(self._fallbacks):
                 assert isinstance(fallback, ConfigManager)
-                try:
+                if fallback.has_section(section):
                     results.update(fallback.get_section(section))
-                except KeyError:
-                    pass
-                else:
                     found = True
             if self._config.has_section(section):
                 found = True
@@ -694,13 +691,17 @@ class ConfigManager:
         verify_type(section, str, non_empty=True)
         verify_type(option, str, non_empty=True)
 
-        try:
+        if self.has_option(section, option):
             content = self.get_option(section, option)
-            if not content:
-                raise KeyError(section, option)
-        except KeyError:
+        else:
+            content = None
+
+        if not content:
             if default is NotImplemented:
-                raise
+                if self.has_section(section):
+                    raise KeyError(option)
+                else:
+                    raise KeyError(section)
             else:
                 return default
 
@@ -750,11 +751,11 @@ class ConfigManager:
         """
         verify_type(section, str, non_empty=True)
 
-        try:
+        if self.has_section(section):
             content = self.get_section(section)
-        except KeyError:
+        else:
             if default is NotImplemented:
-                raise
+                raise KeyError(section)
             else:
                 return default
 
