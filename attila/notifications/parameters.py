@@ -10,7 +10,7 @@ import socket
 import traceback
 
 
-from ..context import get_entry_point_name, get_entry_point_version
+from ..context import get_entry_point_name, get_entry_point_version, auto_context
 from ..exceptions import verify_type
 
 
@@ -48,6 +48,8 @@ def general_notification_parameters(event, time=None):
 
     verify_type(time, datetime.datetime, allow_none=True)
 
+    context = auto_context.current()
+
     return dict(
         host=socket.gethostname(),
         user=getpass.getuser(),
@@ -56,6 +58,7 @@ def general_notification_parameters(event, time=None):
         version=get_entry_point_version(),
         event=event,
         time=datetime.datetime.now() if time is None else time,
+        testing=context.testing if context else False
     )
 
 

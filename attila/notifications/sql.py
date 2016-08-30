@@ -95,8 +95,9 @@ class SQLNotifier(Notifier, Configurable):
         assert isinstance(line, str)
         line = line.strip()
         original_line = line
-        if line.split()[0].lower() == 'nullable':
-            line = line[8:].strip()
+        split_line = line.split()
+        if split_line[0].lower() in ('nullable', 'null'):
+            line = line[len(split_line[0]):].strip()
             nullable = True
         else:
             nullable = False

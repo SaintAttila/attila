@@ -321,10 +321,12 @@ class auto_context:
             return stack[-1]
         return default
 
-    def __init__(self, name=None, version=None, manager=None, start_time=None):
+    def __init__(self, name=None, version=None, manager=None, start_time=None, testing=False):
         if start_time is None:
             start_time = datetime.datetime.now()
         verify_type(start_time, datetime.datetime)
+
+        verify_type(testing, bool)
 
         if not name:
             name = get_entry_point_name('UNKNOWN')
@@ -372,6 +374,9 @@ class auto_context:
         loggers = manager.load_option('Environment', 'Loggers', 'list', None)
         verify_type(loggers, list, allow_none=True)
 
+        testing = manager.load_option('Environment', 'Testing', 'bool', testing)
+        verify_type(testing, bool)
+
         if loggers is None:
             logging.basicConfig()
         else:
@@ -417,6 +422,7 @@ class auto_context:
         self._version = version
         self._manager = manager
         self._start_time = start_time
+        self._testing = testing
 
         self._root_dir = root_dir
         self._workspace = workspace_dir
@@ -513,6 +519,15 @@ class auto_context:
         :return: A ConfigManager instance.
         """
         return self._manager
+
+    @property
+    def testing(self):
+        """
+        Whether the automation is executing in test mode.
+
+        :return: A bool value.
+        """
+        return self._testing
 
     @property
     def root_dir(self):
