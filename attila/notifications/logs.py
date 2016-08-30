@@ -85,10 +85,6 @@ class LogNotifier(Notifier, Configurable):
         else:
             logger = logging.getLogger(name)
 
-        # TODO: Provide a means for configuring the logger here and in
-        #       the method above, too. Right now, the log isn't getting
-        #       configured and so the messages just go nowhere.
-
         return cls(*args, logger=logger, level=level, msg=msg, **kwargs)
 
     def __init__(self, logger, level=None, msg=None):
