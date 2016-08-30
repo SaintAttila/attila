@@ -77,14 +77,8 @@ class LogNotifier(Notifier, Configurable):
         verify_type(section, str, non_empty=True)
 
         name = manager.load_option(section, 'Name', str)
-        level = manager.load_option(section, 'Level', str, 'INFO')
+        level = manager.load_option(section, 'Level', 'log_level', logging.INFO)
         msg = manager.load_option(section, 'Message', str, None)
-
-        if level.isdigit():
-            level = int(level)
-        else:
-            level = getattr(logging, level.upper())
-            assert isinstance(level, int)
 
         if not name or name.lower() == 'root':
             logger = logging.root
@@ -156,6 +150,8 @@ class LogNotifier(Notifier, Configurable):
         # Extract arguments that the logger itself accepts.
         log_args = {}
         for name in ('exc_info', 'stack_info', 'extra'):
+            if name == 'exc_info' and kwargs.get(name, None) in (None, (None, None, None)):
+                continue
             if name in kwargs:
                 log_args[name] = kwargs[name]
 
