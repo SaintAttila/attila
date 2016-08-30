@@ -20,8 +20,6 @@ import smtplib
 import socket
 import textwrap
 
-from distutils.util import strtobool
-
 
 from ..abc.configurations import Configurable
 from ..abc.connections import Connector, connection
@@ -248,7 +246,7 @@ class EmailConnector(Connector, Configurable):
         to = manager.load_option(section, 'To', to_email_address_set, None)
         cc = manager.load_option(section, 'CC', to_email_address_set, None)
         bcc = manager.load_option(section, 'BCC', to_email_address_set, None)
-        html = manager.load_option(section, 'HTML Content', strtobool, False)
+        html = manager.load_option(section, 'HTML Content', 'bool', False)
 
         if port is not None:
             server += ':' + str(port)
@@ -387,7 +385,7 @@ class EmailNotifier(connection, Notifier, Configurable):
             with body_template_path.open() as body_file:
                 body_template = body_file.read()
 
-        add_footer = manager.load_option(section, 'Add Footer', strtobool, True)
+        add_footer = manager.load_option(section, 'Add Footer', 'bool', True)
 
         return cls(
             *args,
