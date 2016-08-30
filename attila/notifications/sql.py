@@ -262,7 +262,22 @@ class SQLNotifier(Notifier, Configurable):
         if self._keep_open:
             if not self._connection.is_open:
                 self._connection.open()
-            self._connection.execute(command)
+
+            # Sometimes the connection gets broken if there has been a long delay, but
+            # it doesn't show up as closed until an exception occurs. If that could be
+            # the case, just reopen the connection and try one more time. If we get
+            # another exception, we can be confident there is some other problem and
+            # we should let the exception pass through to the caller.
+
+            # noinspection PyBroadException
+            try:
+                self._connection.execute(command)
+            except Exception:
+                if not self._connection.is_open:
+                    self._connection.open()
+                    self._connection.execute(command)
+                else:
+                    raise
         else:
             with self._connection:
                 self._connection.execute(command)
