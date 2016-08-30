@@ -588,10 +588,7 @@ class ConfigManager:
                     else:
                         return self.interpolate(value, section)
             if default is NotImplemented:
-                if self.has_section(section):
-                    raise KeyError(option)
-                else:
-                    raise KeyError(section)
+                raise KeyError(section, option)
             return default
 
     def _load_object(self, value, loader=None):
@@ -698,10 +695,7 @@ class ConfigManager:
 
         if not content:
             if default is NotImplemented:
-                if self.has_section(section):
-                    raise KeyError(option)
-                else:
-                    raise KeyError(section)
+                raise KeyError(section, option)
             else:
                 return default
 
