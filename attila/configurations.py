@@ -8,6 +8,7 @@ file.
 
 
 import configparser
+import datetime
 import keyword
 import os
 import threading
@@ -484,7 +485,7 @@ class ConfigManager:
         verify_type(section, str, non_empty=True)
         verify_type(option, str, non_empty=True)
         with self._config_lock:
-            if self._config.has_option(section, option):
+            if self._config.has_option(section, option) and self._config.get(section, option):
                 return True
             return any(fallback.has_option(section, option) for fallback in self._fallbacks)
 
@@ -526,13 +527,16 @@ class ConfigManager:
                 if char == INTERPOLATION_CLOSE:
                     escaped = False
                     opened = False
-                    if content.count(SECTION_OPTION_SEPARATOR) == 1:
-                        section, option = content.split(SECTION_OPTION_SEPARATOR)
+                    if '%' in content:
+                        result += datetime.datetime.now().strftime(content)
                     else:
-                        assert default_section is not None
-                        section = default_section
-                        option = content
-                    result += self.get_option(section, option)
+                        if content.count(SECTION_OPTION_SEPARATOR) == 1:
+                            section, option = content.split(SECTION_OPTION_SEPARATOR)
+                        else:
+                            assert default_section is not None
+                            section = default_section
+                            option = content
+                        result += self.get_option(section, option)
                     content = ''
                 else:
                     content += char
@@ -692,6 +696,8 @@ class ConfigManager:
 
         try:
             content = self.get_option(section, option)
+            if not content:
+                raise KeyError(section, option)
         except KeyError:
             if default is NotImplemented:
                 raise
