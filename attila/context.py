@@ -2,8 +2,8 @@
 A standardized automation environment
 """
 
-import getpass
 import datetime
+import getpass
 import inspect
 import logging
 import os
@@ -11,16 +11,13 @@ import socket
 import threading
 import traceback
 import warnings
-
 from functools import wraps
 
-
 from .abc.files import Path
-
 from .configurations import get_automation_config_manager, ConfigManager, iter_config_search_paths
 from .exceptions import verify_type, verify_callable
+from .logging import Logger
 from .utility import last
-
 
 __author__ = 'Aaron Hosford'
 __all__ = [
@@ -312,63 +309,66 @@ class auto_context:
         data_dir = manager.load_option('Environment', 'Data Folder Path', Path,
                                        default=root_dir / 'data')
 
-        log_file_name_template = manager.load_option(
-            'Environment',
-            'Log File Name Template',
-            str,
-            default='%Y%m%d%H%M%S.log'
-        )
-        log_entry_format = manager.load('Environment', 'Log Entry Format', str,
-                                        default='%(asctime)s_pid:%(process)d ~*~ %(message)s')
-        log_level = manager.load('Environment', 'Log Level', str,
-                                 default='INFO')
+        loggers = manager.load_option('Environment', 'Loggers', 'list', None)
+        verify_type(loggers, list, allow_none=True)
 
-        log_file_name = start_time.strftime(log_file_name_template)
-        log_file_path = log_dir[log_file_name]
-
-        if log_level.isdigit():
-            log_level = int(log_level)
+        if loggers is None:
+            logging.basicConfig()
         else:
-            log_level = getattr(logging, log_level.upper())
-        verify_type(log_level, int)
+            for index, logger_name in enumerate(loggers):
+                logger = manager.load_section(logger_name, Logger)
+                verify_type(logger, logging.Logger)
+
+        # log_file_name_template = manager.load_option(
+        #     'Environment',
+        #     'Log File Name Template',
+        #     str,
+        #     default='%Y%m%d%H%M%S.log'
+        # )
+        # log_entry_format = manager.load('Environment', 'Log Entry Format', str,
+        #                                 default='%(asctime)s_pid:%(process)d ~*~ %(message)s')
+        # log_level = manager.load('Environment', 'Log Level', str,
+        #                          default='INFO')
+        #
+        # log_file_name = start_time.strftime(log_file_name_template)
+        # log_file_path = log_dir[log_file_name]
+        #
+        # if log_level.isdigit():
+        #     log_level = int(log_level)
+        # else:
+        #     log_level = getattr(logging, log_level.upper())
+        # verify_type(log_level, int)
 
         # Start of automation
-        automation_start_notifier = \
-            manager.load_option('Environment', 'Automation Start Notifier', default=None)
+        automation_start_notifier = manager.load_option('Environment', 'On Automation Start', default=None)
         verify_callable(automation_start_notifier, allow_none=True)
 
         # Error (not necessarily terminated or a failure)
-        automation_error_notifier = \
-            manager.load_option('Environment', 'Automation Error Notifier', default=None)
+        automation_error_notifier = manager.load_option('Environment', 'On Automation Error', default=None)
         verify_callable(automation_error_notifier, allow_none=True)
 
         # End of automation
-        automation_end_notifier = \
-            manager.load_option('Environment', 'Automation End Notifier', default=None)
+        automation_end_notifier = manager.load_option('Environment', 'On Automation End', default=None)
         verify_callable(automation_end_notifier, allow_none=True)
 
         # Start of task
-        task_start_notifier = \
-            manager.load_option('Environment', 'Task Start Notifier', default=None)
+        task_start_notifier = manager.load_option('Environment', 'On Task Start', default=None)
         verify_callable(task_start_notifier, allow_none=True)
 
         # Task completed successfully (not necessarily terminated)
-        task_success_notifier = \
-            manager.load_option('Environment', 'Task Success Notifier', default=None)
+        task_success_notifier = manager.load_option('Environment', 'On Task Success', default=None)
         verify_callable(task_success_notifier, allow_none=True)
 
         # Task failure (not necessarily terminated or an error)
-        task_failure_notifier = \
-            manager.load_option('Environment', 'Task Failure Notifier', default=None)
+        task_failure_notifier = manager.load_option('Environment', 'On Task Failure', default=None)
         verify_callable(task_failure_notifier, allow_none=True)
 
         # Error (not necessarily terminated or a failure)
-        task_error_notifier = \
-            manager.load_option('Environment', 'Task Error Notifier', default=None)
+        task_error_notifier = manager.load_option('Environment', 'On Task Error', default=None)
         verify_callable(automation_error_notifier, allow_none=True)
 
         # Task failure (not necessarily terminated or an error)
-        task_end_notifier = manager.load_option('Environment', 'Task End Notifier', default=None)
+        task_end_notifier = manager.load_option('Environment', 'On Task End', default=None)
         verify_callable(task_end_notifier, allow_none=True)
 
         self._automation_root = automation_root
@@ -383,9 +383,9 @@ class auto_context:
         self._docs_dir = docs_dir
         self._data_dir = data_dir
 
-        self._log_file_path = log_file_path
-        self._log_entry_format = log_entry_format
-        self._log_level = log_level
+        # self._log_file_path = log_file_path
+        # self._log_entry_format = log_entry_format
+        # self._log_level = log_level
 
         self._automation_start_notifier = automation_start_notifier
         self._automation_error_notifier = automation_error_notifier
@@ -492,32 +492,32 @@ class auto_context:
         """
         return self._log_dir
 
-    @property
-    def log_file_path(self):
-        """
-        The path to the log file the automation should log to.
-
-        :return: A Path instance.
-        """
-        return self._log_file_path
-
-    @property
-    def log_entry_format(self):
-        """
-        The log format the automation should use.
-
-        :return: A string.
-        """
-        return self._log_entry_format
-
-    @property
-    def log_level(self):
-        """
-        The log level the automation should use.
-
-        :return: An integer.
-        """
-        return self._log_level
+    # @property
+    # def log_file_path(self):
+    #     """
+    #     The path to the log file the automation should log to.
+    #
+    #     :return: A Path instance.
+    #     """
+    #     return self._log_file_path
+    #
+    # @property
+    # def log_entry_format(self):
+    #     """
+    #     The log format the automation should use.
+    #
+    #     :return: A string.
+    #     """
+    #     return self._log_entry_format
+    #
+    # @property
+    # def log_level(self):
+    #     """
+    #     The log level the automation should use.
+    #
+    #     :return: An integer.
+    #     """
+    #     return self._log_level
 
     @property
     def docs_dir(self):
