@@ -130,7 +130,7 @@ class SQLiteConnector(sql.SQLConnector, configurations.Configurable):
         return super().connect()
 
     def __str__(self):
-        return ':memory:' if self._path is None else str(self._path)
+        return ':memory:' if self._path is None else str(abs(self._path))
 
     def __repr__(self):
         if self._path is None:
