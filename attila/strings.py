@@ -10,8 +10,8 @@ String parsing, formatting, and matching routines.
 
 import ast
 import datetime
+import logging
 import re
-import time
 
 
 from .abc.configurations import Configurable
@@ -535,6 +535,22 @@ def split_port(ip_port, default=None):
         server = ip_port
         port = default
     return server, port
+
+
+@config_loader('log_level')
+def parse_log_level(string):
+    """
+    Parse a log level, e.g. INFO, WARNING, etc.
+
+    :param string: An integer or the name of a log level.
+    :return: The integer value of the log level.
+    """
+    if string.isdigit():
+        level = int(string)
+    else:
+        level = getattr(logging, string.upper())
+        verify_type(level, int)
+    return level
 
 
 @config_loader('list')
