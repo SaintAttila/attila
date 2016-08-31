@@ -4,6 +4,7 @@ Bindings for sending email notifications.
 
 
 import datetime
+import logging
 
 # Yes, these all have to be imported individually.
 import email
@@ -28,7 +29,7 @@ from ..abc.notifications import Notifier
 
 from ..strings import split_port, to_list_of_strings
 from ..configurations import ConfigManager, get_automation_config_manager
-from ..context import get_entry_point_name
+from ..context import get_entry_point_name, get_entry_point_version
 from ..exceptions import verify_type, OperationNotSupportedError
 from ..plugins import config_loader
 
@@ -43,6 +44,9 @@ __all__ = [
     'EmailConnector',
     'EmailNotifier',
 ]
+
+
+log = logging.getLogger(__name__)
 
 
 DEFAULT_EMAIL_PORT = 25
@@ -144,6 +148,8 @@ def send_email(server, sender, subject, body, to, cc=None, bcc=None, attachments
 
     recipients = sorted(set(to_sorted + cc_sorted + bcc_sorted))
 
+    log.info("Sending email from %s to %s, CC %s, with subject %r.", sender, to_sorted, cc_sorted, subject)
+
     con = smtplib.SMTP(server, port)
     try:
         con.sendmail(sender, recipients, message.as_string())
@@ -165,10 +171,11 @@ def get_standard_footer():
         """
 
         **************************************************
-        ** Task:\t{task}
-        ** User:\t{user}
-        ** Host:\t{host}
-        ** Time:\t{time:%m/%d/%Y %I:%M:%S %p}
+        ** Process:\t{process}
+        ** Version:\t{version}
+        ** User:   \t{user}
+        ** Host:   \t{host}
+        ** Time:   \t{time:%m/%d/%Y %I:%M:%S %p}
         **************************************************
         """
     )
@@ -188,7 +195,8 @@ def get_standard_footer():
                 template = template_file.read()
 
     return template.format(
-        task=get_entry_point_name('UNKNOWN'),
+        process=get_entry_point_name('UNKNOWN'),
+        version=get_entry_point_version('UNKNOWN'),
         user=getpass.getuser(),
         host=socket.gethostname(),
         time=datetime.datetime.now()
@@ -443,9 +451,8 @@ class EmailNotifier(connection, Notifier, Configurable):
 
         self.verify_open()
 
-        time_stamp = datetime.datetime.now()
-        subject = self.interpolate(self._subject_template, args, kwargs, time_stamp=time_stamp)
-        body = self.interpolate(self._body_template, args, kwargs, time_stamp=time_stamp)
+        subject = self.interpolate(self._subject_template, args, kwargs)
+        body = self.interpolate(self._body_template, args, kwargs)
 
         if self._add_footer:
             body += get_standard_footer()
