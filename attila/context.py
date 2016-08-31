@@ -204,24 +204,30 @@ def notification_parameters(event, task=None, message=None, exc_info=None, args=
 
 class task:
     """
-    Use with the 'with' statement to automatically track what task is being performed.
+    Use with the 'with' statement to automatically track what task or subtask is being performed.
 
     Example Usage:
         with task("Doing stuff..."):
             print("Now I'm doing stuff.")
 
-            with task("Doing more detailed stuff..."):
+            with subtask("Doing more detailed stuff..."):
                 print("This is getting complicated.")
 
-    If and when an error occurs, the nested tasks that were failed will automatically generate
-    notifications. Notifications are also generated automatically when the with block is entered
-    and exited cleanly. The default notifiers can be set at the automation level:
+    If and when an error occurs, the nested tasks or subtasks that were failed will automatically
+    generate notifications. Notifications are also generated automatically when the with block is
+    entered and exited cleanly. The default notifiers can be set at the automation level:
 
         automation.current().task_start_notifier = start_notifier
         automation.current().task_success_notifier = success_notifier
         automation.current().task_failure_notifier = failure_notifier
         automation.current().task_error_notifier = error_notifier
         automation.current().task_end_notifier = end_notifier
+
+        automation.current().subtask_start_notifier = start_notifier
+        automation.current().subtask_success_notifier = success_notifier
+        automation.current().subtask_failure_notifier = failure_notifier
+        automation.current().subtask_error_notifier = error_notifier
+        automation.current().subtask_end_notifier = end_notifier
 
     This is handy for testing and debugging, when more in-depth notifications are needed, since a
     lot of normally unnecessary notifications can be turned on/off with a single switch.
@@ -249,6 +255,13 @@ class task:
             self.failure_notifier = None
             self.error_notifier = None
             self.end_notifier = None
+
+        # TODO: Consider loading additional notifiers by looking for sections of the name.
+        #           "On Task {description} Start"
+        #           "On Task {description} Success"
+        #           etc.
+        #       Another possibility would be to use wildcards in the names and perform
+        #       pattern matching, but I'm not sure this is a good idea.
 
         if start_notifier is not NotImplemented:
             self.start_notifier = start_notifier
@@ -376,6 +389,72 @@ class task:
         return False  # Indicates exceptions should NOT be suppressed.
 
 
+# noinspection PyPep8Naming
+class subtask(task):
+    """
+    Use with the 'with' statement to automatically track what task or subtask is being performed.
+
+    Example Usage:
+        with task("Doing stuff..."):
+            print("Now I'm doing stuff.")
+
+            with subtask("Doing more detailed stuff..."):
+                print("This is getting complicated.")
+
+    If and when an error occurs, the nested tasks or subtasks that were failed will automatically
+    generate notifications. Notifications are also generated automatically when the with block is
+    entered and exited cleanly. The default notifiers can be set at the automation level:
+
+        automation.current().task_start_notifier = start_notifier
+        automation.current().task_success_notifier = success_notifier
+        automation.current().task_failure_notifier = failure_notifier
+        automation.current().task_error_notifier = error_notifier
+        automation.current().task_end_notifier = end_notifier
+
+        automation.current().subtask_start_notifier = start_notifier
+        automation.current().subtask_success_notifier = success_notifier
+        automation.current().subtask_failure_notifier = failure_notifier
+        automation.current().subtask_error_notifier = error_notifier
+        automation.current().subtask_end_notifier = end_notifier
+
+    This is handy for testing and debugging, when more in-depth notifications are needed, since a
+    lot of normally unnecessary notifications can be turned on/off with a single switch.
+    """
+
+    def __init__(self, description, start_notifier=NotImplemented, success_notifier=NotImplemented,
+                 failure_notifier=NotImplemented, error_notifier=NotImplemented,
+                 end_notifier=NotImplemented):
+
+        context = auto_context.current()
+        if context is not None:
+            assert isinstance(context, auto_context)
+            default_start_notifier = context.subtask_start_notifier
+            default_success_notifier = context.subtask_success_notifier
+            default_failure_notifier = context.subtask_failure_notifier
+            default_error_notifier = context.subtask_error_notifier
+            default_end_notifier = context.subtask_end_notifier
+        else:
+            default_start_notifier = None
+            default_success_notifier = None
+            default_failure_notifier = None
+            default_error_notifier = None
+            default_end_notifier = None
+
+        if start_notifier is NotImplemented:
+            start_notifier = default_start_notifier
+        if success_notifier is NotImplemented:
+            success_notifier = default_success_notifier
+        if failure_notifier is NotImplemented:
+            failure_notifier = default_failure_notifier
+        if error_notifier is NotImplemented:
+            error_notifier = default_error_notifier
+        if end_notifier is NotImplemented:
+            end_notifier = default_end_notifier
+
+        super().__init__(description, start_notifier, success_notifier, failure_notifier,
+                         error_notifier, end_notifier)
+
+
 class auto_context:
     """
     Interface for automation processes to access environment and configuration settings.
@@ -496,11 +575,30 @@ class auto_context:
 
         # Error (not necessarily terminated or a failure)
         task_error_notifier = manager.load_option('Environment', 'On Task Error', default=None)
-        verify_callable(automation_error_notifier, allow_none=True)
+        verify_callable(task_error_notifier, allow_none=True)
 
         # Task failure (not necessarily terminated or an error)
         task_end_notifier = manager.load_option('Environment', 'On Task End', default=None)
         verify_callable(task_end_notifier, allow_none=True)
+
+        subtask_start_notifier = manager.load_option('Environment', 'On Subtask Start', default=None)
+        verify_callable(subtask_start_notifier, allow_none=True)
+
+        # Task completed successfully (not necessarily terminated)
+        subtask_success_notifier = manager.load_option('Environment', 'On Subtask Success', default=None)
+        verify_callable(subtask_success_notifier, allow_none=True)
+
+        # Task failure (not necessarily terminated or an error)
+        subtask_failure_notifier = manager.load_option('Environment', 'On Subtask Failure', default=None)
+        verify_callable(subtask_failure_notifier, allow_none=True)
+
+        # Error (not necessarily terminated or a failure)
+        subtask_error_notifier = manager.load_option('Environment', 'On Subtask Error', default=None)
+        verify_callable(subtask_error_notifier, allow_none=True)
+
+        # Task failure (not necessarily terminated or an error)
+        subtask_end_notifier = manager.load_option('Environment', 'On Subtask End', default=None)
+        verify_callable(subtask_end_notifier, allow_none=True)
 
         self._automation_root = automation_root
 
@@ -529,6 +627,12 @@ class auto_context:
         self._task_failure_notifier = task_failure_notifier
         self._task_error_notifier = task_error_notifier
         self._task_end_notifier = task_end_notifier
+
+        self._subtask_start_notifier = subtask_start_notifier
+        self._subtask_success_notifier = subtask_success_notifier
+        self._subtask_failure_notifier = subtask_failure_notifier
+        self._subtask_error_notifier = subtask_error_notifier
+        self._subtask_end_notifier = subtask_end_notifier
 
         for path in workspace_dir, log_dir, docs_dir, data_dir:
             assert isinstance(path, Path)
@@ -723,7 +827,7 @@ class auto_context:
 
         :return: A Notifier instance.
         """
-        return self._task_success_notifier
+        return self._task_start_notifier
 
     @property
     def task_success_notifier(self):
@@ -759,7 +863,52 @@ class auto_context:
 
         :return: A Notifier instance.
         """
-        return self._task_failure_notifier
+        return self._task_end_notifier
+
+    @property
+    def subtask_start_notifier(self):
+        """
+        Use this notifier when entering the context of a task.
+
+        :return: A Notifier instance.
+        """
+        return self._subtask_start_notifier
+
+    @property
+    def subtask_success_notifier(self):
+        """
+        Use this notifier when leaving the context of a task that has been marked as a success.
+
+        :return: A Notifier instance.
+        """
+        return self._subtask_success_notifier
+
+    @property
+    def subtask_failure_notifier(self):
+        """
+        Use this notifier when leaving the context of a task that has been marked as a failure.
+
+        :return: A Notifier instance.
+        """
+        return self._subtask_failure_notifier
+
+    @property
+    def subtask_error_notifier(self):
+        """
+        Use this notifier when an unhandled exception causes the context of a task to be left.
+
+        :return: A Notifier instance.
+        """
+        return self._subtask_error_notifier
+
+    @property
+    def subtask_end_notifier(self):
+        """
+        Use this notifier when leaving the context of a task under any conditions.
+
+        :return: A Notifier instance.
+        """
+        return self._subtask_end_notifier
 
     def __enter__(self):
         self._get_stack().append(self)
