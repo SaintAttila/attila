@@ -8,7 +8,7 @@ Setup script for attila package.
 import os
 import sys
 
-from setuptools import setup, find_packages
+from setuptools import setup
 
 try:
     # noinspection PyUnresolvedReferences

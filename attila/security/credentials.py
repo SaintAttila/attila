@@ -8,8 +8,7 @@ import collections
 
 from ..abc.configurations import Configurable
 from ..abc.files import Path
-from ..configurations import ConfigManager, INTERPOLATION_ESCAPE, INTERPOLATION_OPEN, \
-    INTERPOLATION_CLOSE
+from ..configurations import ConfigManager
 from ..exceptions import verify_type
 from ..plugins import config_loader
 from . import encryption, passwords

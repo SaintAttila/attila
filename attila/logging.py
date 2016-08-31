@@ -31,16 +31,16 @@ class LogHandler(Configurable, metaclass=ABCMeta):
         assert isinstance(manager, ConfigManager)
         verify_type(section, str, non_empty=True)
 
-        format = manager.load_option(section, 'Format', LogFormat, None)
-        verify_type(format, LogFormat, allow_none=True)
-        if format is None:
-            format = LogFormat()
+        formatter = manager.load_option(section, 'Format', LogFormat, None)
+        verify_type(formatter, LogFormat, allow_none=True)
+        if formatter is None:
+            formatter = LogFormat()
 
         level = manager.load_option(section, 'Level', 'log_level', logging.INFO)
 
         result = cls(*args, **kwargs)
 
-        result.formatter = format
+        result.formatter = formatter
         result.level = level
 
         return result
