@@ -17,7 +17,7 @@ __install_requires__ = [
     'cryptography',
     'pywin32',
     'setuptools',
-    'wmi'
+    'wmi',
 
     # In-house
     'infotags',
