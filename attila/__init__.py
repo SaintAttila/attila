@@ -21,7 +21,7 @@ __install_requires__ = [
 
     # In-house
     'infotags',
-    'sql_dialects',
+    'sql_dialects>=0.1',
 ]
 __url__ = 'TBD'
 __version__ = '1.3'
