@@ -12,7 +12,7 @@ __author_email__ = 'Aaron.Hosford@Ericsson.com'
 __description__ = 'Saint Attila: Automation Library'
 __long_description__ = __doc__
 __license__ = 'MIT (https://opensource.org/licenses/MIT)'
-__requires__ = [
+__install_requires__ = [
     # 3rd-party
     'cryptography',
     'pywin32',
