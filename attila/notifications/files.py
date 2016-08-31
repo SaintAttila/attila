@@ -117,7 +117,8 @@ class FileNotifier(Notifier, Configurable):
         if self._format_string is None:
             print(*args, file=self._file_obj, **kwargs)
         else:
-            self._file_obj.write(self._format_string.format(*args, **kwargs))
+            data = self.interpolate(self._format_string, args, kwargs)
+            self._file_obj.write(data)
 
     def close(self):
         """Close the file notifier, and its associated file."""

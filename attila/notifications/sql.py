@@ -249,8 +249,7 @@ class SQLNotifier(Notifier, Configurable):
         else:
             command = command.update()
         for nullable, field_type, field_name, value_template in self._fields:
-            # Interpolate keyword arguments
-            value_str = value_template.format_map(kwargs)
+            value_str = self.interpolate(value_template, (), kwargs)
             if nullable and value_str.lower() in ('', 'none', 'null'):
                 value = None
                 sql_type = LiteralTypes.NULL

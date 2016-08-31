@@ -11,8 +11,8 @@ from ..abc.configurations import Configurable
 from ..abc.notifications import Notifier
 
 from ..configurations import ConfigManager
+from ..context import notification_parameters, EXCEPTION_EVENT
 from ..exceptions import verify_type
-from ..notifications.parameters import notification_parameters, EXCEPTION_EVENT
 from ..plugins import config_loader
 from ..strings import to_list_of_strings
 

@@ -444,8 +444,9 @@ class EmailNotifier(connection, Notifier, Configurable):
         self.verify_open()
 
         time_stamp = datetime.datetime.now()
-        subject = time_stamp.strftime(self._subject_template.format(*args, **kwargs))
-        body = time_stamp.strftime(self._body_template.format(*args, **kwargs))
+        subject = self.interpolate(self._subject_template, args, kwargs, time_stamp=time_stamp)
+        body = self.interpolate(self._body_template, args, kwargs, time_stamp=time_stamp)
+
         if self._add_footer:
             body += get_standard_footer()
 
