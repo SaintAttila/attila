@@ -17,7 +17,7 @@ from .abc.files import Path
 from .configurations import get_automation_config_manager, ConfigManager, iter_config_search_paths
 from .exceptions import verify_type, verify_callable
 from .logging import Logger
-from .utility import last
+from .utility import first
 
 __author__ = 'Aaron Hosford'
 __all__ = [
@@ -646,16 +646,13 @@ class auto_context:
         based on the local attila installation's configuration.
         """
 
-        # TODO: This is broken; it finds the version at preferred_config_path instead of the one
-        #       inside the folder in site-packages, which basically means it tries to copy the old
-        #       file over itself if overwrite is set.
-        current_config_path = last(iter_config_search_paths(self._name), None)
-        if current_config_path is None:
+        reference_config_path = first(iter_config_search_paths(self._name), None)
+        if reference_config_path is None:
             warnings.warn("Config file not found.")
             return
 
-        current_config_path = Path(current_config_path)
-        current_config_path.verify_is_file()
+        reference_config_path = Path(reference_config_path)
+        reference_config_path.verify_is_file()
 
         preferred_config_path = self._manager.load_option(
             'Environment',
@@ -665,14 +662,18 @@ class auto_context:
         )
         assert isinstance(preferred_config_path, Path)
 
-        if not overwrite and preferred_config_path.is_file:
+        if abs(reference_config_path) == abs(preferred_config_path):
+            warnings.warn(("The Environment:Preferred Config Path option in the parameters is set "
+                           "to point to the reference copy of the configuration file, located at "
+                           "%s. No action could be taken.") % abs(reference_config_path))
+        elif not overwrite and preferred_config_path.is_file:
             warnings.warn(("The configuration file %s already exists. If you wish to update it, "
                            "you must either update the config file manually, or import the module "
                            "and call %s.main.context.post_install_hook(overwrite=True) to "
                            "overwrite it.") %
                           (abs(preferred_config_path), self._name))
         else:
-            current_config_path.copy_to(preferred_config_path, overwrite)
+            reference_config_path.copy_to(preferred_config_path, overwrite)
 
     @property
     def automation_root(self):
