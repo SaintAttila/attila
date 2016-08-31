@@ -5,6 +5,7 @@ Interface definition for notifiers.
 
 import datetime
 
+
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
 
@@ -25,7 +26,7 @@ class Notifier(metaclass=ABCMeta):
     """
 
     @staticmethod
-    def interpolate(template, args, kwargs, *, time_stamp=None):
+    def interpolate(template, args, kwargs):
         """
         Interpolate the given keyword arguments into a string template, handling the standard
         notification parameters in a uniform way for all notifiers.
@@ -33,32 +34,19 @@ class Notifier(metaclass=ABCMeta):
         :param template: A string template.
         :param args: The positional arguments to interpolate into the template.
         :param kwargs: The keyword arguments to interpolate into the template.
-        :param time_stamp: An optional datetime used to apply time formatting, or True to use the
-            current time.
         :return: The interpolated string.
         """
 
         verify_type(template, str)
         verify_type(kwargs, (dict, defaultdict))
 
-        if isinstance(time_stamp, bool):
-            if time_stamp:
-                time_stamp = datetime.datetime.now()
-            else:
-                time_stamp = None
-        verify_type(time_stamp, datetime.datetime, allow_none=True)
-
         kwargs = defaultdict(lambda: None, **kwargs)
 
-        if 'task' not in kwargs:
-            kwargs.update(task='unspecified')
+        # TODO: Other defaults?
+        if 'time' not in kwargs:
+            kwargs.update(time=datetime.datetime.now())
 
-        result = (template % args).format_map(**kwargs)
-
-        if time_stamp:
-            result = time_stamp.strftime(result)
-
-        return result
+        return template.format(*args, **kwargs)
 
     @abstractmethod
     def __call__(self, *args, attachments=None, **kwargs):
