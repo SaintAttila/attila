@@ -640,6 +640,8 @@ class auto_context:
             if not path.is_dir:
                 path.make_dir()
 
+    # TODO: Can't we set defaults for the parameters to this method in the attila
+    #       configuration file and/or in the automation's config file itself?
     def post_install_hook(self, overwrite=True, ask=True):
         """
         This is called by attila.installation.setup() after installation completes, which gives the
