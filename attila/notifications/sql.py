@@ -293,6 +293,7 @@ class SQLNotifier(Notifier, Configurable):
                 else:
                     with self._connection:
                         self._connection.execute(command)
+                break
             except Exception:
                 if tries <= 0:
                     raise
