@@ -640,7 +640,7 @@ class auto_context:
             if not path.is_dir:
                 path.make_dir()
 
-    def post_install_hook(self, overwrite=False):
+    def post_install_hook(self, overwrite=True, ask=True):
         """
         This is called by attila.installation.setup() after installation completes, which gives the
         automation the opportunity to install its config and data files in the appropriate location
@@ -667,14 +667,35 @@ class auto_context:
             warnings.warn(("The Environment:Preferred Config Path option in the parameters is set "
                            "to point to the reference copy of the configuration file, located at "
                            "%s. No action could be taken.") % abs(reference_config_path))
-        elif not overwrite and preferred_config_path.is_file:
-            warnings.warn(("The configuration file %s already exists. If you wish to update it, "
-                           "you must either update the config file manually, or import the module "
-                           "and call %s.main.context.post_install_hook(overwrite=True) to "
-                           "overwrite it.") %
-                          (abs(preferred_config_path), self._name))
-        else:
+            return
+
+        file_exists = preferred_config_path.is_file
+
+        if overwrite and file_exists and ask:
+            if reference_config_path.size == preferred_config_path.size:
+                with reference_config_path.open() as reference:
+                    with preferred_config_path.open() as preferred:
+                        files_differ = False
+                        while True:
+                            ref_line = reference.readline()
+                            pref_line = preferred.readline()
+                            if ref_line.strip() != pref_line.strip():
+                                files_differ = True
+                                break
+                            if not ref_line and not pref_line:
+                                break
+            else:
+                files_differ = True
+
+            if files_differ:
+                # TODO: Provide a diff to make the decision easier?
+                choice = input("The file %s already exists. Overwrite? (y/n) " % abs(preferred_config_path))
+                overwrite = choice.lower().startswith('y')
+
+        if overwrite or not file_exists:
             reference_config_path.copy_to(preferred_config_path, overwrite)
+        else:
+            warnings.warn("The file %s already exists and was not updated." % abs(preferred_config_path))
 
     @property
     def automation_root(self):
