@@ -8,6 +8,7 @@ import inspect
 import logging
 import os
 import socket
+import sys
 import threading
 import traceback
 import warnings
@@ -885,14 +886,36 @@ class auto_context:
         return self._subtask_end_notifier
 
     def __enter__(self):
-        self._get_stack().append(self)
-        if self._automation_start_notifier is not None:
-            self._automation_start_notifier(
-                **notification_parameters(
-                    START_EVENT,
-                    time=self._start_time
+        # We have to be extremely careful here, to ensure that automation error and end notifications
+        # are sent and the stack is unwound in the event of an exception during initialization.
+        appended = False
+        try:
+            self._get_stack().append(self)
+            appended = True
+            if self._automation_start_notifier is not None:
+                self._automation_start_notifier(
+                    **notification_parameters(
+                        START_EVENT,
+                        time=self._start_time
+                    )
                 )
-            )
+        except:
+            try:
+                self._automation_error_notifier(
+                    **notification_parameters(
+                        EXCEPTION_EVENT,
+                        exc_info=sys.exc_info()
+                    )
+                )
+            finally:
+                try:
+                    if self._automation_end_notifier is not None:
+                        self._automation_end_notifier(**notification_parameters(END_EVENT))
+                finally:
+                    if appended:
+                        self._get_stack().pop()
+            raise
+
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
