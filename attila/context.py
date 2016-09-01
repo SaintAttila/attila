@@ -748,33 +748,6 @@ class auto_context:
         """
         return self._log_dir
 
-    # @property
-    # def log_file_path(self):
-    #     """
-    #     The path to the log file the automation should log to.
-    #
-    #     :return: A Path instance.
-    #     """
-    #     return self._log_file_path
-    #
-    # @property
-    # def log_entry_format(self):
-    #     """
-    #     The log format the automation should use.
-    #
-    #     :return: A string.
-    #     """
-    #     return self._log_entry_format
-    #
-    # @property
-    # def log_level(self):
-    #     """
-    #     The log level the automation should use.
-    #
-    #     :return: An integer.
-    #     """
-    #     return self._log_level
-
     @property
     def docs_dir(self):
         """
