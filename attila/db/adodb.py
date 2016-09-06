@@ -12,6 +12,9 @@ ADODB database interface for Python
 #       how complicated is it going to get?
 
 
+# TODO: Migrate off of COM, if possible.
+
+
 import win32com.client
 
 

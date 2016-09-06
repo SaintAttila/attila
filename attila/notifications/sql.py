@@ -164,6 +164,7 @@ class SQLNotifier(Notifier, Configurable):
         verify_type(connection, sql_connection)
 
         keep_open = manager.load_option(section, 'Keep Open', 'bool', True)
+        retries = manager.load_option(section, 'Retries', int, 0)
 
         # TODO: Support stored procedures?
         command_type = manager.load_option(section, 'Command Type', str)
@@ -192,14 +193,19 @@ class SQLNotifier(Notifier, Configurable):
             fields=field_list,
             command_type=command_type,
             keep_open=keep_open,
+            retries=retries,
             **kwargs
         )
 
-    def __init__(self, connection, table, fields, command_type=None, keep_open=True):
+    def __init__(self, connection, table, fields, command_type=None, keep_open=True, retries=0):
         verify_type(connection, sql_connection)
         verify_type(command_type, str, non_empty=True, allow_none=True)
         verify_type(table, str, non_empty=True)
         verify_type(keep_open, bool)
+        verify_type(retries, int)
+
+        if retries < 0:
+            raise ValueError(retries)
 
         if command_type is None:
             command_type = 'INSERT'
@@ -226,6 +232,7 @@ class SQLNotifier(Notifier, Configurable):
         self._fields = tuple(entries)
         self._command_type = command_type
         self._keep_open = keep_open
+        self._retries = retries
 
     def __del__(self):
         if self._connection.is_open:
@@ -259,25 +266,34 @@ class SQLNotifier(Notifier, Configurable):
                 value = parser(value_str)
             command = command.set(**{field_name: V(value, sql_type)})
 
-        if self._keep_open:
-            if not self._connection.is_open:
-                self._connection.open()
-
-            # Sometimes the connection gets broken if there has been a long delay, but
-            # it doesn't show up as closed until an exception occurs. If that could be
-            # the case, just reopen the connection and try one more time. If we get
-            # another exception, we can be confident there is some other problem and
-            # we should let the exception pass through to the caller.
-
+        tries = self._retries + 1
+        while True:
+            tries -= 1
             # noinspection PyBroadException
             try:
-                self._connection.execute(command)
-            except Exception:
-                if not self._connection.is_open:
-                    self._connection.open()
-                    self._connection.execute(command)
+                if self._keep_open:
+                    if not self._connection.is_open:
+                        self._connection.open()
+
+                    # Sometimes the connection gets broken if there has been a long delay, but
+                    # it doesn't show up as closed until an exception occurs. If that could be
+                    # the case, just reopen the connection and try one more time. If we get
+                    # another exception, we can be confident there is some other problem and
+                    # we should let the exception pass through to the caller.
+
+                    # noinspection PyBroadException
+                    try:
+                        self._connection.execute(command)
+                    except Exception:
+                        if not self._connection.is_open:
+                            self._connection.open()
+                            self._connection.execute(command)
+                        else:
+                            raise
                 else:
+                    with self._connection:
+                        self._connection.execute(command)
+                break
+            except Exception:
+                if tries <= 0:
                     raise
-        else:
-            with self._connection:
-                self._connection.execute(command)

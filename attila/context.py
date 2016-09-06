@@ -8,6 +8,7 @@ import inspect
 import logging
 import os
 import socket
+import sys
 import threading
 import traceback
 import warnings
@@ -639,7 +640,9 @@ class auto_context:
             if not path.is_dir:
                 path.make_dir()
 
-    def post_install_hook(self, overwrite=False):
+    # TODO: Can't we set defaults for the parameters to this method in the attila
+    #       configuration file and/or in the automation's config file itself?
+    def post_install_hook(self, overwrite=True, ask=True):
         """
         This is called by attila.installation.setup() after installation completes, which gives the
         automation the opportunity to install its config and data files in the appropriate location
@@ -666,14 +669,35 @@ class auto_context:
             warnings.warn(("The Environment:Preferred Config Path option in the parameters is set "
                            "to point to the reference copy of the configuration file, located at "
                            "%s. No action could be taken.") % abs(reference_config_path))
-        elif not overwrite and preferred_config_path.is_file:
-            warnings.warn(("The configuration file %s already exists. If you wish to update it, "
-                           "you must either update the config file manually, or import the module "
-                           "and call %s.main.context.post_install_hook(overwrite=True) to "
-                           "overwrite it.") %
-                          (abs(preferred_config_path), self._name))
-        else:
+            return
+
+        file_exists = preferred_config_path.is_file
+
+        if overwrite and file_exists and ask:
+            if reference_config_path.size == preferred_config_path.size:
+                with reference_config_path.open() as reference:
+                    with preferred_config_path.open() as preferred:
+                        files_differ = False
+                        while True:
+                            ref_line = reference.readline()
+                            pref_line = preferred.readline()
+                            if ref_line.strip() != pref_line.strip():
+                                files_differ = True
+                                break
+                            if not ref_line and not pref_line:
+                                break
+            else:
+                files_differ = True
+
+            if files_differ:
+                # TODO: Provide a diff to make the decision easier?
+                choice = input("The file %s already exists. Overwrite? (y/n) " % abs(preferred_config_path))
+                overwrite = choice.lower().startswith('y')
+
+        if overwrite or not file_exists:
             reference_config_path.copy_to(preferred_config_path, overwrite)
+        else:
+            warnings.warn("The file %s already exists and was not updated." % abs(preferred_config_path))
 
     @property
     def automation_root(self):
@@ -747,33 +771,6 @@ class auto_context:
         :return: A Path instance.
         """
         return self._log_dir
-
-    # @property
-    # def log_file_path(self):
-    #     """
-    #     The path to the log file the automation should log to.
-    #
-    #     :return: A Path instance.
-    #     """
-    #     return self._log_file_path
-    #
-    # @property
-    # def log_entry_format(self):
-    #     """
-    #     The log format the automation should use.
-    #
-    #     :return: A string.
-    #     """
-    #     return self._log_entry_format
-    #
-    # @property
-    # def log_level(self):
-    #     """
-    #     The log level the automation should use.
-    #
-    #     :return: An integer.
-    #     """
-    #     return self._log_level
 
     @property
     def docs_dir(self):
@@ -912,14 +909,36 @@ class auto_context:
         return self._subtask_end_notifier
 
     def __enter__(self):
-        self._get_stack().append(self)
-        if self._automation_start_notifier is not None:
-            self._automation_start_notifier(
-                **notification_parameters(
-                    START_EVENT,
-                    time=self._start_time
+        # We have to be extremely careful here, to ensure that automation error and end notifications
+        # are sent and the stack is unwound in the event of an exception during initialization.
+        appended = False
+        try:
+            self._get_stack().append(self)
+            appended = True
+            if self._automation_start_notifier is not None:
+                self._automation_start_notifier(
+                    **notification_parameters(
+                        START_EVENT,
+                        time=self._start_time
+                    )
                 )
-            )
+        except:
+            try:
+                self._automation_error_notifier(
+                    **notification_parameters(
+                        EXCEPTION_EVENT,
+                        exc_info=sys.exc_info()
+                    )
+                )
+            finally:
+                try:
+                    if self._automation_end_notifier is not None:
+                        self._automation_end_notifier(**notification_parameters(END_EVENT))
+                finally:
+                    if appended:
+                        self._get_stack().pop()
+            raise
+
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):

@@ -167,8 +167,13 @@ class mutex:
         if self._held_count:
             self._held_count += 1
             return True
-
-        return wait_for_handle(self._handle, timeout)
+        else:
+            self._held_count += 1
+            try:
+                return wait_for_handle(self._handle, timeout)
+            except:
+                self._held_count -= 1
+                raise
 
     def unlock(self):
         """Called to unlock the mutex. This should be called once for each time
@@ -176,13 +181,12 @@ class mutex:
         required."""
         if self._held_count <= 0:
             self._held_count = 0  # Just in case it somehow ended up negative.
-            raise ValueError("mutex " + repr(self._name) +
-                             " cannot be released because it is not held.")
+            raise ValueError("mutex %r cannot be released because it is not held." % self._name)
         elif self._held_count > 1:
             self._held_count -= 1
         else:
             if not self._release(self._handle):
-                raise RuntimeError("Failed to unlock mutex " + repr(self._name) + ".")
+                raise RuntimeError("Failed to unlock mutex %r." % self._name)
             self._held_count = 0
 
     def __enter__(self):

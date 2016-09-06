@@ -2,6 +2,10 @@
 Installation mechanisms for attila.
 """
 
+# TODO: Add an Environment:On Installation option in attila.ini, to allow, for example, the
+#       automatic notification and/or logging of the currently installed version of a
+#       library or automation on each server.
+
 import sys
 import traceback
 import warnings
