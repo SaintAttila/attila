@@ -573,20 +573,23 @@ class ConfigManager:
         verify_type(section, str, non_empty=True)
         verify_type(option, str, non_empty=True)
         with self._config_lock:
-            if self._config.has_option(section, option):
-                value = self._config[section][option]
-                if raw:
-                    return value
-                else:
-                    return self.interpolate(value, section)
-            for fallback in self._fallbacks:
-                assert isinstance(fallback, ConfigManager)
-                if fallback.has_option(section, option):
-                    value = fallback.get_option(section, option, default, raw=True)
+            try:
+                if self._config.has_option(section, option):
+                    value = self._config[section][option]
                     if raw:
                         return value
                     else:
                         return self.interpolate(value, section)
+                for fallback in self._fallbacks:
+                    assert isinstance(fallback, ConfigManager)
+                    if fallback.has_option(section, option):
+                        value = fallback.get_option(section, option, default, raw=True)
+                        if raw:
+                            return value
+                        else:
+                            return self.interpolate(value, section)
+            except Exception as exc:
+                raise KeyError(section, option) from exc
             if default is NotImplemented:
                 raise KeyError(section, option)
             return default
@@ -716,14 +719,17 @@ class ConfigManager:
             if cache_key in self._loaded_instances:
                 return self._loaded_instances[cache_key]
 
-            if hasattr(loader, 'load_config_value'):
-                result = loader.load_config_value(self, content)
-            else:
-                result = loader(content)
+            try:
+                if hasattr(loader, 'load_config_value'):
+                    result = loader.load_config_value(self, content)
+                else:
+                    result = loader(content)
+            except Exception as exc:
+                raise KeyError(section, option) from exc
 
             self._loaded_instances[cache_key] = result
 
-        return result
+            return result
 
     def load_section(self, section, loader=None, default=NotImplemented):
         """
@@ -775,14 +781,17 @@ class ConfigManager:
             if cache_key in self._loaded_instances:
                 return self._loaded_instances[cache_key]
 
-            if hasattr(loader, 'load_config_section'):
-                result = loader.load_config_section(self, section)
-            else:
-                result = loader(content)
+            try:
+                if hasattr(loader, 'load_config_section'):
+                    result = loader.load_config_section(self, section)
+                else:
+                    result = loader(content)
+            except Exception as exc:
+                raise KeyError(section) from exc
 
             self._loaded_instances[cache_key] = result
 
-        return result
+            return result
 
     def load(self, section, option=None, loader=None, default=NotImplemented):
         """
