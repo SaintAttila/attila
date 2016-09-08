@@ -92,8 +92,12 @@ class LogFileHandler(LogHandler, logging.FileHandler):
         )
 
     def __init__(self, filename, mode='a', encoding=None, delay=False):
+        path = Path(filename)
+        if path.dir:
+            path.dir.make_dir(overwrite=True)
+
         Configurable.__init__(self)
-        logging.FileHandler.__init__(self, filename, mode, encoding, delay)
+        logging.FileHandler.__init__(self, str(abs(path)), mode, encoding, delay)
 
 
 @config_loader

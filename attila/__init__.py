@@ -23,8 +23,8 @@ __install_requires__ = [
     'infotags',
     'sql_dialects>=0.1',
 ]
-__url__ = 'TBD'
-__version__ = '1.4'
+__url__ = 'https://scmgr.eams.ericsson.net/PythonLibs/Attila'
+__version__ = '1.4.1'
 __packages__ = [
     'attila',
     'attila.abc',
