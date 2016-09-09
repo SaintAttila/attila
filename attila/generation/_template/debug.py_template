@@ -1,0 +1,10 @@
+"""
+This is the entry point for debuggers that require the entry point to be a
+module (like PyScripter), as opposed to a package. This file is not part of the
+package itself, and should be included by setup.py in the distribution but not
+the installation.
+"""
+
+import {package}
+
+{package}.main()

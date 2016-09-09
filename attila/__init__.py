@@ -34,6 +34,7 @@ __packages__ = [
     'attila.security'
 ]
 __package_data__ = {'attila': ['attila.ini']}
+__entry_points__ = {'console_scripts': ['new_attila_package = attila.generation:main']}
 
 
 plugins.load_plugins()
