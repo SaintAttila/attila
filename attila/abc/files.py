@@ -391,6 +391,11 @@ class Path(Configurable):
         return self._connection.is_file(self)
 
     @property
+    def is_link(self):
+        """Whether this path refers to a symbolic link."""
+        return self._connection.is_link(self)
+
+    @property
     def exists(self):
         """Whether this path refers to an existing file system object."""
         return self._connection.exists(self)
@@ -774,6 +779,60 @@ class Path(Configurable):
         """
         return self._connection.find_unique_file(self, pattern, most_recent)
 
+    def _walk_split(self, onerror):
+        dirnames = []
+        filenames = []
+
+        try:
+            listing = self.list()
+        except OSError as exc:
+            if onerror is not None:
+                onerror(exc)
+        else:
+            for name in listing:
+                try:
+                    if self[name].is_dir:
+                        dirnames.append(name)
+                    else:
+                        filenames.append(name)
+                except OSError as exc:
+                    if onerror is not None:
+                        onerror(exc)
+
+        return dirnames, filenames
+
+    def walk(self, topdown=True, onerror=None, followlinks=False):
+        if topdown:
+            dirnames, filenames = self._walk_split(onerror)
+            yield (self, dirnames, filenames)
+            stack = [(self, dirnames)]
+            while stack:
+                dirpath, dirnames = stack.pop()
+                if dirnames:
+                    subdir = dirpath / dirnames.pop(0)
+                    assert isinstance(subdir, Path)
+                    stack.append((dirpath, dirnames))
+
+                    if followlinks or not subdir.is_link:
+                        dirnames, filenames = subdir._walk_split(onerror)
+                        yield subdir, dirnames, filenames
+                        stack.append((subdir, dirnames))
+        else:
+            dirnames, filenames = self._walk_split(onerror)
+            frame = (self, dirnames, filenames)
+            stack = [(frame, dirnames.copy())]
+            while stack:
+                frame, remaining = stack.pop()
+                dirpath = frame[0]
+                if remaining:
+                    subdir = dirpath / remaining.pop(0)
+                    if followlinks or not subdir.is_link:
+                        dirnames, filenames = dirpath._walk_split(onerror)
+                        frame = (subdir, dirnames, filenames)
+                        stack.append((frame, dirnames.copy()))
+                else:
+                    yield frame
+
 
 class FSConnector(Connector, Configurable, metaclass=ABCMeta):
     """
@@ -1097,6 +1156,19 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
         :return: Whether the path is a file.
         """
         raise OperationNotSupportedError()
+
+    def is_link(self, path):
+        """
+        Determine if the path refers to a symbolic link.
+
+        :param path: The path to operate on.
+        :return: Whether the path is a symbolic link.
+        """
+        # By default, assumes symbolic links are not supported. Subclasses can override this
+        # behavior if it isn't a good assumption, but on most non-local file systems it will
+        # be accurate. It's important that this doesn't default to raising an exception
+        # because it's used in the Path.walk() method.
+        return False
 
     def exists(self, path):
         """
