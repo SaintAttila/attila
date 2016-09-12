@@ -198,6 +198,15 @@ class local_fs_connection(fs_connection):
         """
         return os.path.isfile(self.check_path(path))
 
+    def is_link(self, path):
+        """
+        Determine if the path refers to a symbolic link.
+
+        :param path: The path to operate on.
+        :return: Whether the path is a symbolic link.
+        """
+        return os.path.islink(self.check_path(path))
+
     def exists(self, path):
         """
         Determine if the path refers to an existing file object.
