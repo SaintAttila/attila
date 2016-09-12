@@ -15,7 +15,7 @@ USAGE:
 """
 
 from ..abc.files import Path
-from ..configurations import get_attila_config_manager
+from ..configurations import get_automation_config_manager
 from ..fs import getcwd
 
 
@@ -28,10 +28,14 @@ Attila Package Generator
 
 
 DESCRIPTION_HOW_TO = """
+-------------------
+Project Description
+-------------------
+
 Please paste in a high-level description of the purpose of the new package.
-(Please Do NOT go into detail as to how will accomplish that purpose.) It is
-highly recommended that you compose your description in a separate editor so
-you don't lose your work. Hit return 3 times to end your description.
+(Please do NOT go into detail as to how it will accomplish that purpose.) It
+is highly recommended that you compose your description in a separate editor
+so you don't lose your work. Hit return 3 times to end your description.
 """
 
 
@@ -40,9 +44,6 @@ The new package has been generated. To get started developing, please use your
 preferred editor to search for the keyword, TODO, and follow the directions
 provided there.
 """
-
-
-DEFAULT_URL_TEMPLATE = 'TBD'
 
 
 TEMPLATE_FILE_SUFFIX = '_template'
@@ -68,12 +69,25 @@ def ask(option_name, *, default=None, normalize=str.strip, non_empty=True, valid
     """Ask the user for a piece of information in a standardized way."""
     value = None
     option_name = to_title(option_name)
+
+    print()
+    print('-' * len(option_name))
+    print(option_name)
+    print('-' * len(option_name))
+    print()
+
     while True:
         print()
         if default:
-            print("Default %s is %s." % (option_name, default))
-            print("Provide a different value or hit enter to use the default.")
-        value = input('%s: ' % option_name)
+            print("Provide a value, or press enter to use the default.")
+            print()
+            print("Default: %s" % default)
+            value = input('Override: ')
+        else:
+            print("No default set. A value must be entered.")
+            print()
+            value = input('Value: ')
+
         if normalize:
             value = normalize(value)
         if default:
@@ -84,8 +98,11 @@ def ask(option_name, *, default=None, normalize=str.strip, non_empty=True, valid
             print("Invalid value. Please try again.")
         else:
             break
-    print("%s set to %s." % (option_name, value))
+
+    print("%s set to: %s" % (option_name, value))
     print()
+    print()
+
     return value
 
 
@@ -167,12 +184,12 @@ def main():
        `python -m attila.generation`.
     """
 
-    manager = get_attila_config_manager()
+    manager = get_automation_config_manager()
 
     section = 'Code Generation'
     default_author = manager.load_option(section, 'Author', str, None)
     default_author_email = manager.load_option(section, 'Author Email', str, None)
-    url_template = manager.load_option(section, 'URL Template', str, DEFAULT_URL_TEMPLATE).strip()
+    url_template = manager.load_option(section, 'URL Template', str, None)
 
     template_path = manager.load_option(section, 'Package Template Path', Path, None)
 
