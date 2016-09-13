@@ -46,12 +46,12 @@ class Credential(collections.namedtuple('Credential', 'user password domain'), C
         assert isinstance(manager, ConfigManager)
         verify_type(value, str, non_empty=True)
 
-        user, system_name = value.split('@')
+        user, domain = value.split('@')
         verify_type(user, str, non_empty=True)
-        verify_type(system_name, str, non_empty=True)
+        verify_type(domain, str, non_empty=True)
 
-        password = passwords.get_password(system_name, user)
-        return cls(*args, user=user, password=password, **kwargs)
+        password = passwords.get_password(domain, user)
+        return cls(*args, user=user, password=password, domain=domain, **kwargs)
 
     @classmethod
     def load_config_section(cls, manager, section, *args, **kwargs):
