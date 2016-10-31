@@ -186,6 +186,8 @@ class SQLNotifier(Notifier, Configurable):
             if line.strip()
         ]
 
+        # TODO: UPDATE command type is useless without a WHERE clause. Provide a way to add conditions.
+
         return cls(
             *args,
             connection=connection,
