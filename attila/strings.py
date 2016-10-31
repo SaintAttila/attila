@@ -557,7 +557,7 @@ def parse_log_level(string):
 def to_list_of_strings(items, normalizer=None):
     """
     Convert a parameter value, which may be None, a delimited string, or a sequence of non-delimited
-    strings, into a list of unique, non-empty, non-delimited strings.
+    strings, into a list of non-empty, non-delimited strings.
 
     :param items: The set of items, in whatever form they may take.
     :param normalizer: A function which normalizes the items.
@@ -578,3 +578,21 @@ def to_list_of_strings(items, normalizer=None):
         items = [normalizer(item) for item in items if item.strip()]
 
     return [item.strip() for item in items if item.strip()]
+
+
+@config_loader('lines')
+def to_list_of_lines(string, normalizer=None):
+    """
+    Convert a parameter value, which may be None or a string, into a list of non-empty strings by splitting on newlines.
+
+    :param string: The original string.
+    :param normalizer: A function which normalizes the items, e.g. str.upper.
+    :return: The separated, normalized items, in a list.
+    """
+    verify_type(string, str, allow_none=True)
+    if not string:
+        return []
+    if normalizer:
+        return [normalizer(line.strip()) for line in string.splitlines() if line.strip()]
+    else:
+        return [line.strip() for line in string.splitlines() if line.strip()]
