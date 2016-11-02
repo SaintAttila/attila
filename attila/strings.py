@@ -15,6 +15,7 @@ import re
 
 
 from .abc.configurations import Configurable
+from .abc.files import Path
 from .configurations import ConfigManager
 from .exceptions import verify_type, OperationNotSupportedError
 from .plugins import config_loader
@@ -571,8 +572,11 @@ def to_list_of_strings(items, normalizer=None):
     else:
         items = list(items)
 
-    for item in items:
-        assert isinstance(item, str)
+        for index, item in enumerate(items):
+            if isinstance(item, Path):
+                items[index] = str(item)
+            else:
+                assert isinstance(item, str)
 
     if normalizer:
         items = [normalizer(item) for item in items if item.strip()]
