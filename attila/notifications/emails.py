@@ -10,6 +10,7 @@ import logging
 import email
 import email.encoders
 import email.mime
+import email.mime.application
 import email.mime.base
 import email.mime.text
 import email.mime.multipart
@@ -124,31 +125,31 @@ def send_email(server, sender, subject, body, to, cc=None, bcc=None, attachments
 
     message = email.mime.multipart.MIMEMultipart()
 
+    # Add header info
+    message['From'] = sender
+    message['To'] = email.utils.COMMASPACE.join(to_sorted)
+    message['CC'] = email.utils.COMMASPACE.join(cc_sorted)
+    message['Date'] = email.utils.formatdate(localtime=True)
+    message['Subject'] = subject
+
+    # Add body
+    body_obj = email.mime.text.MIMEText(body, 'html' if html else 'plain')
+    message.attach(body_obj)
+
     # Add attachments
     for attachment in attachments_sorted:
         with open(attachment, 'rb') as attachment_file:
             attachment_data = attachment_file.read()
-        attachment_obj = email.mime.base.MIMEBase('application', 'octet-stream')
-        attachment_obj.set_payload(attachment_data)
-        email.encoders.encode_base64(attachment_obj)
-        attachment_obj.add_header(
-            'Content-Disposition', 'attachment; filename="%s"' % os.path.basename(attachment)
-        )
+
+        attachment_obj = email.mime.application.MIMEApplication(attachment_data, Name=os.path.basename(attachment))
+        attachment_obj['Content-Disposition'] = 'attachment; filename="%s"' % os.path.basename(attachment)
+
         message.attach(attachment_obj)
-
-    # Add body
-    body_obj = email.mime.text.MIMEText(body, 'use_html' if html else 'plain')
-    message.attach(body_obj)
-
-    # Add header info
-    message['From'] = sender
-    message['To'] = ','.join(to_sorted)
-    message['CC'] = ','.join(cc_sorted)
-    message['Subject'] = subject
 
     recipients = sorted(set(to_sorted + cc_sorted + bcc_sorted))
 
-    log.info("Sending email from %s to %s, CC %s, with subject %r.", sender, to_sorted, cc_sorted, subject)
+    log.info("Sending email from %s to %s, CC %s, with subject %r via %s.",
+             sender, to_sorted, cc_sorted, subject, server)
 
     con = smtplib.SMTP(server, port)
     try:
