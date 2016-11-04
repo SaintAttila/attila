@@ -339,7 +339,7 @@ class ADODBConnector(sql.SQLConnector, configurations.Configurable):
         result = \
             "Driver={%s};Server={%s};Database={%s}" % (self._driver, self._server, self._database)
         if self._credential:
-            user, password = self._credential
+            user, password = self._credential[:2]
             result += ";Uid={%s};Pwd={%s}" % (user, password)
         if self._trusted is not None:
             result += ";Trusted_Connection=%s" % repr(self._trusted)
