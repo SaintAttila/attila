@@ -131,3 +131,14 @@ class Credential(Configurable):
 
     def __hash__(self):
         return hash((self._user, self._password, self._domain))
+
+    def __iter__(self):
+        yield self._user
+        yield self._password
+        yield self._domain
+
+    def __len__(self):
+        return 3
+
+    def __getitem__(self, item):
+        return (self._user, self._password, self._domain)[item]
