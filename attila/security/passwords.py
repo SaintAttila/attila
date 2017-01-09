@@ -215,8 +215,8 @@ def get_users(domain, valid=True):
     # "SELECT UserName FROM AutomationPasswords WHERE System = '" +
     # domain + "' AND Valid = " + str(int(valid))
     query = T.AutomationPasswords.select(F.UserName).where(
-        F.System == V(domain) &
-        F.Valid == V(valid)
+        (F.System == V(domain)) &
+        (F.Valid == V(valid))
     )
 
     # Query the DB for the username.
