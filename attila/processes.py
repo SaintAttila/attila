@@ -22,6 +22,7 @@ __all__ = [
     "count_processes",
     "get_pids",
     "get_name",
+    "get_command_line",
     "get_parent_pid",
     "get_child_pids",
     "kill_process",
@@ -89,6 +90,24 @@ def get_name(pid, default=None):
     try:
         return only(
             process.Properties_("Name").Value
+            for process in win32com.client.GetObject('winmgmts:').InstancesOf('Win32_Process')
+            if process.Properties_("ProcessID").Value == pid
+        )
+    except TooFewItemsError:
+        return default
+
+
+def get_command_line(pid, default=None):
+    """
+    Return the command line of the process if it exists, or the default otherwise.
+
+    :param pid: The process ID.
+    :param default: The default value to return if the process does not exist.
+    :return: The command line that created the process.
+    """
+    try:
+        return only(
+            process.Properties_("CommandLine").Value
             for process in win32com.client.GetObject('winmgmts:').InstancesOf('Win32_Process')
             if process.Properties_("ProcessID").Value == pid
         )
