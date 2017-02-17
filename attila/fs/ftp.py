@@ -118,7 +118,7 @@ class FTPConnector(FSConnector):
         verify_type(server, str, non_empty=True)
         server, port = strings.split_port(server, DEFAULT_FTP_PORT)
 
-        assert credential.user and credential.password
+        assert credential.user
 
         verify_type(passive, bool)
 
@@ -215,7 +215,7 @@ class ftp_connection(fs_connection):
         self._session = ftplib.FTP()
         self._session.set_pasv(self._connector.passive)
         self._session.connect(self._connector.server, self._connector.port)
-        self._session.login(user, password)
+        self._session.login(user, password or '')
 
     def close(self):
         """Close the FTP connection"""
