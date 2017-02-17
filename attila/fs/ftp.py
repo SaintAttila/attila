@@ -210,7 +210,7 @@ class ftp_connection(fs_connection):
         """Open the FTP connection."""
         assert not self.is_open
 
-        user, password = self._connector.credential
+        user, password, _ = self._connector.credential
 
         self._session = ftplib.FTP()
         self._session.set_pasv(self._connector.passive)
