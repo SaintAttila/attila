@@ -82,11 +82,11 @@ class Credential(Configurable):
         super().__init__()
 
         assert user is None or (user and isinstance(user, str))
-        assert password is None or (password and isinstance(password, str))
+        assert not password or isinstance(password, str)
         assert domain is None or (domain and isinstance(domain, str))
 
         self._user = user
-        self._password = password
+        self._password = password or None
         self._domain = domain
 
     def __bool__(self):

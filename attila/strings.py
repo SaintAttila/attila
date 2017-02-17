@@ -229,23 +229,7 @@ def format_ordinal(number):
     return ('-' if negative else '') + str(number) + suffix
 
 
-def glob_to_regex(pattern, case_sensitive=False, wildcard='*'):
-    """
-    Convert a glob-style pattern to a compiled regular expression.
-
-    :param pattern: A string containing zero or more wildcard characters.
-    :param case_sensitive: A Boolean indicating whether the regex should be case sensitive. Case
-        insensitive by default.
-    :param wildcard: The wildcard character. Asterisk (*) by default.
-    :return: A compiled regular expression, as returned by re.compile().
-    """
-    assert isinstance(pattern, str)
-    assert isinstance(wildcard, str)
-    assert wildcard
-
-    flags = (0 if case_sensitive else re.IGNORECASE)
-    return re.compile('^' + '.*'.join(re.escape(piece) for piece in pattern.split(wildcard)) + '$',
-                      flags)
+6
 
 
 def glob_match(pattern, string, case_sensitive=False, wildcard='*'):
