@@ -217,6 +217,8 @@ class ftp_connection(fs_connection):
         self._session.connect(self._connector.server, self._connector.port)
         self._session.login(user, password or '')
 
+        super().open()
+
     def close(self):
         """Close the FTP connection"""
         assert self.is_open
