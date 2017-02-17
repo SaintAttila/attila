@@ -193,6 +193,9 @@ class Path(Configurable):
     def __enter__(self):
         return temp_cwd(self)
 
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        return False
+
     def __str__(self):
         return self._location
 
