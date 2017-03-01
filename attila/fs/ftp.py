@@ -6,6 +6,7 @@ FTP file system support
 import ftplib
 import os
 import socket
+import time
 
 from distutils.util import strtobool
 from urllib.parse import urlparse
@@ -17,7 +18,7 @@ from . import local
 from ..abc.files import Path, FSConnector, fs_connection
 
 from ..configurations import ConfigManager
-from ..exceptions import verify_type
+from ..exceptions import verify_type, OperationNotSupportedError
 from ..plugins import config_loader, url_scheme
 from ..security import credentials
 from .proxies import ProxyFile
@@ -31,6 +32,8 @@ __all__ = [
 
 
 DEFAULT_FTP_PORT = 21
+INT_TIME_FORMAT = '%Y%m%d%H%M%S'
+FLOAT_TIME_FORMAT = '%Y%m%d%H%M%S.%f'
 
 
 @config_loader
@@ -353,6 +356,33 @@ class ftp_connection(fs_connection):
         dir_path, file_name = os.path.split(path)
         with Path(dir_path, self):
             return self._session.size(file_name)
+
+    def modified_time(self, path):
+        """
+        Get the last time the data of file system object was modified.
+
+        :param path: The path to operate on.
+        :return: The time stamp, as a float.
+        """
+        assert self.is_open
+        path = Path(self.check_path(path), self)
+        with Path(path.dir):
+            result = self._session.sendcmd('MDTM %s' % path.name)
+            response_code = result.split()[0]
+            if response_code != '213':
+                if path.exists:
+                    raise OperationNotSupportedError()
+                else:
+                    raise FileNotFoundError()
+            timestamp = result.split()[-1]
+            if '.' in timestamp:
+                time_format = INT_TIME_FORMAT
+            else:
+                time_format = FLOAT_TIME_FORMAT
+            try:
+                return time.mktime(time.strptime(timestamp, time_format))
+            except ValueError as exc:
+                raise OperationNotSupportedError() from exc
 
     def remove(self, path):
         """
