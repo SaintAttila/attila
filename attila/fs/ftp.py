@@ -235,14 +235,26 @@ class ftp_connection(fs_connection):
     @property
     def cwd(self):
         """The current working directory of this FTP connection."""
-        assert self.is_open
-        return Path(self._session.pwd(), self)
+        if self.is_open:
+            result = Path(self._session.pwd(), self)
+            if not self._cwd_stack:
+                self._cwd_stack.append(result)
+            else:
+                self._cwd_stack[-1] = result
+            return result
+        elif self._cwd_stack:
+            return self._cwd_stack[-1]
+        else:
+            result = Path('/', self)
+            self._cwd_stack.append(result)
+            return result
 
     @cwd.setter
     def cwd(self, path):
-        assert self.is_open
         path = self.check_path(path)
-        self._session.cwd(path)
+        if self.is_open:
+            self._session.cwd(path)
+        super().cwd = path
 
     def _download(self, remote_path, local_path):
         assert self.is_open
@@ -252,7 +264,7 @@ class ftp_connection(fs_connection):
         dir_path, file_name = os.path.split(remote_path)
 
         with Path(dir_path, self):
-            with open(abs(local_path), 'wb') as local_file:
+            with open(local_path, 'wb') as local_file:
                 self._session.retrbinary("RETR " + file_name, local_file.write)
 
     def _upload(self, local_path, remote_path):
@@ -263,7 +275,7 @@ class ftp_connection(fs_connection):
         dir_path, file_name = os.path.split(remote_path)
 
         with Path(dir_path, self):
-            with open(abs(local_path), 'rb') as local_file:
+            with open(local_path, 'rb') as local_file:
                 self._session.retrbinary("STOR " + file_name, local_file)
 
     def open_file(self, path, mode='r', buffering=-1, encoding=None, errors=None, newline=None,
@@ -288,7 +300,8 @@ class ftp_connection(fs_connection):
 
         # We can't work directly with an FTP file. Instead, we will create a temp file and return it
         # as a proxy.
-        temp_path = local.local_fs_connection.get_temp_file_path(self.name(path))
+        with local.local_fs_connection() as connection:
+            temp_path = str(abs(connection.get_temp_file_path(self.name(path))))
 
         # If we're not truncating the file, then we'll need to copy down the data.
         if mode not in ('w', 'wb'):

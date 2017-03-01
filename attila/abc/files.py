@@ -51,34 +51,6 @@ FORM_FEED_CHAR = '\x0C'
 #         for operation in self._operations:
 
 
-class temp_cwd:
-    """
-    This class just temporarily changes the working directory of a file system connection, and then
-    changes it back. It's meant for use in a with statement. It only exists to allow Paths to be
-    used as 'with' contexts. It is not meant to be a part of this module's public interface.
-    """
-
-    def __init__(self, path):
-        verify_type(path, Path)
-        self._path = path
-        self._previous_path = None
-
-    def __enter__(self):
-        self._previous_path = None
-        if self._path:
-            previous_path = self._path.connection.cwd
-            self._previous_path = previous_path
-            self._path.connection.cwd = self._path
-        return self
-
-    # noinspection PyUnusedLocal
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        if self._previous_path is not None:
-            self._path.connection.cwd = self._previous_path
-            self._previous_path = None
-        return False  # Do not suppress exceptions.
-
-
 @config_loader
 class Path(Configurable):
     """
@@ -191,9 +163,11 @@ class Path(Configurable):
         return bool(self._location)
 
     def __enter__(self):
-        return temp_cwd(self)
+        self._connection.push_cwd(self)
+        return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        self._connection.pop_cwd()
         return False
 
     def __str__(self):
@@ -965,6 +939,7 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
     def __init__(self, connector):
         verify_type(connector, FSConnector)
         super().__init__(connector)
+        self._cwd_stack = []
 
     def __eq__(self, other):
         if not isinstance(other, fs_connection):
@@ -976,21 +951,46 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
             return NotImplemented
         return not (self == other)
 
+    def open(self):
+        super().open()
+        cwd = self.cwd
+        if cwd is not None:
+            # This looks strange, but it causes the CWD of the underlying file system to actually be changed, rather
+            # than it only being recorded in the CWD stack.
+            self.cwd = cwd
+
     @property
     def cwd(self):
         """
-        The current working directory of this file system connection, or None if CWD functionality
-        is not supported.
+        The current working directory of this file system connection, or None if undefined.
         """
-        return None
+        if self._cwd_stack:
+            return self._cwd_stack[-1]
+        else:
+            return None
 
     @cwd.setter
     def cwd(self, path):
         """
-        The current working directory of this file system connection, or None if CWD functionality
-        is not supported.
+        The current working directory of this file system connection, or None if undefined.
         """
-        raise OperationNotSupportedError()
+        path = Path(self.check_path(path), self)
+        if not self._cwd_stack:
+            self._cwd_stack.append(path)
+        else:
+            self._cwd_stack[-1] = path
+
+    def push_cwd(self, path):
+        path = Path(self.check_path(path), self)
+        self._cwd_stack.append(path)
+
+    def pop_cwd(self):
+        if not self._cwd_stack:
+            return None
+        elif len(self._cwd_stack) == 1:
+            return self._cwd_stack[-1]
+        else:
+            return self._cwd_stack.pop()
 
     def check_path(self, path):
         """
@@ -1671,7 +1671,8 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
         :return: None
         """
 
-        self.move_to(path, destination[self.name], overwrite, clear, fill, check_only)
+        path = Path(self.check_path(path), self)
+        self.move_to(path, destination[path.name], overwrite, clear, fill, check_only)
 
     def move_to(self, path, destination, overwrite=False, clear=False, fill=True, check_only=None):
         """
