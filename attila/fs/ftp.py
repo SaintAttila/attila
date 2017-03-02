@@ -235,29 +235,23 @@ class ftp_connection(fs_connection):
             self._session = None  # The close your eyes and pretend way
             self._is_open = False
 
-    @property
-    def cwd(self):
-        """The current working directory of this FTP connection."""
+    def getcwd(self):
+        """Get the current working directory of this FTP connection."""
         if self.is_open:
-            result = Path(self._session.pwd(), self)
-            if not self._cwd_stack:
-                self._cwd_stack.append(result)
-            else:
-                self._cwd_stack[-1] = result
-            return result
-        elif self._cwd_stack:
-            return self._cwd_stack[-1]
-        else:
-            result = Path('/', self)
-            self._cwd_stack.append(result)
-            return result
+            super().chdir(self._session.pwd())
+            return super().getcwd()
 
-    @cwd.setter
-    def cwd(self, path):
-        path = self.check_path(path)
-        if self.is_open:
-            self._session.cwd(path)
-        super().cwd = path
+        cwd = super().getcwd()
+        if cwd is not None:
+            return cwd
+
+        super().chdir('/')
+        return super().getcwd()
+
+    def chdir(self, path):
+        """Set the current working directory of this FTP connection."""
+        super().chdir(path)
+        self._session.cwd(str(super().getcwd()))
 
     def _download(self, remote_path, local_path):
         assert self.is_open

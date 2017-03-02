@@ -883,7 +883,7 @@ class FSConnector(Connector, Configurable, metaclass=ABCMeta):
         """Create a new connection and return it."""
         result = super().connect(*args, **kwargs)
         if self._initial_cwd is not None:
-            result.cwd = self._initial_cwd
+            result.chdir(self._initial_cwd)
         return result
 
 
@@ -953,32 +953,34 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
 
     def open(self):
         super().open()
-        cwd = self.cwd
+        cwd = self.getcwd()
         if cwd is not None:
             # This looks strange, but it causes the CWD of the underlying file system to actually be changed, rather
             # than it only being recorded in the CWD stack.
-            self.cwd = cwd
+            self.chdir(cwd)
 
-    @property
-    def cwd(self):
-        """
-        The current working directory of this file system connection, or None if undefined.
-        """
+    def getcwd(self):
         if self._cwd_stack:
             return self._cwd_stack[-1]
         else:
             return None
 
-    @cwd.setter
-    def cwd(self, path):
-        """
-        The current working directory of this file system connection, or None if undefined.
-        """
+    def chdir(self, path):
         path = Path(self.check_path(path), self)
         if not self._cwd_stack:
             self._cwd_stack.append(path)
         else:
             self._cwd_stack[-1] = path
+
+    @property
+    def cwd(self):
+        """The current working directory of this file system connection, or None if undefined."""
+        return self.getcwd()
+
+    @cwd.setter
+    def cwd(self, path):
+        """The current working directory of this file system connection, or None if undefined."""
+        self.chdir(path)
 
     def push_cwd(self, path):
         path = Path(self.check_path(path), self)

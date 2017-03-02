@@ -108,25 +108,19 @@ class local_fs_connection(fs_connection):
         self.check_path(path)
         return True
 
-    @property
-    def cwd(self):
+    def chdir(self, path):
+        """The current working directory of this file system connection."""
+        super().chdir(path)
+        os.chdir(str(super().getcwd()))
+
+    def getcwd(self):
         """The current working directory of this file system connection."""
         # TODO: Should we track the CWD separately for each instance? The OS itself only provides
         #       one CWD per process, but for other new_instance types (e.g. FTP) the CWD is a
         #       per-new_instance value, and this might lead to slight incompatibilities between the
         #       different new_instance types which could destroy the abstraction I've built.
-        result = Path(os.getcwd(), self)
-        if not self._cwd_stack:
-            self._cwd_stack = result
-        elif self._cwd_stack[-1] != result:
-            self._cwd_stack[-1] = result
-        return result
-
-    @cwd.setter
-    def cwd(self, path):
-        """The current working directory of this file system connection."""
-        os.chdir(self.check_path(path))
-        super().cwd = path
+        super().chdir(os.getcwd())
+        return super().getcwd()
 
     def check_path(self, path, expand_user=True, expand_vars=True):
         """
