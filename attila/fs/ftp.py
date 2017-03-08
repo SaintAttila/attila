@@ -331,6 +331,10 @@ class ftp_connection(fs_connection):
                     listing = []
                 else:
                     raise
+            # We have to do this because we can't check if path is a directory,
+            # and if we call nlst on a file name, sometimes it will just return
+            # that file name in the list instead of bombing out.
+            listing = [name for name in listing if self.exists(path[name])]
         if pattern == '*':
             return listing
         else:
@@ -421,7 +425,14 @@ class ftp_connection(fs_connection):
         # noinspection PyBroadException
         try:
             with Path(path, self):
-                return True
+                try:
+                    self._session.nlst()
+                except Exception as exc:
+                    # Some FTP servers give an error if the directory is empty.
+                    if '550 No files found.' in str(exc):
+                        return True
+                    else:
+                        return False
         except Exception:
             return False
 
@@ -437,7 +448,8 @@ class ftp_connection(fs_connection):
 
         # noinspection PyBroadException
         try:
-            self.size(path)
-            return True
+            with Path(path, self):
+                self.size(path)
+                return not self.is_dir(path)
         except Exception:
             return False

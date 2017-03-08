@@ -1334,6 +1334,7 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
         :return: A list of Path instances for each matching file and directory name.
         """
         path = self.check_path(path)
+        self.verify_is_dir(path)
         return [self.join(path, child) for child in self.list(path, pattern)]
 
     def open_file(self, path, mode='r', buffering=-1, encoding=None, errors=None, newline=None,
