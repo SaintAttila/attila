@@ -433,6 +433,8 @@ class ftp_connection(fs_connection):
                         return True
                     else:
                         return False
+                else:
+                    return True
         except Exception:
             return False
 
