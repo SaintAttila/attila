@@ -532,6 +532,9 @@ def parse_date(string, parser=None):
     return date_and_time.date()
 
 
+# TODO: Add a time parser that assumes the current day as the date.
+
+
 @config_loader('timedelta')
 def parse_timedelta(string):
     """
