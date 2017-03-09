@@ -220,7 +220,9 @@ class ftp_connection(fs_connection):
         self._session.connect(self._connector.server, self._connector.port)
         self._session.login(user, password or '')
 
+        cwd = self.getcwd()
         super().open()
+        self.chdir(cwd)
 
     def close(self):
         """Close the FTP connection"""
@@ -241,17 +243,13 @@ class ftp_connection(fs_connection):
             super().chdir(self._session.pwd())
             return super().getcwd()
 
-        cwd = super().getcwd()
-        if cwd is not None:
-            return cwd
-
-        super().chdir('/')
         return super().getcwd()
 
     def chdir(self, path):
         """Set the current working directory of this FTP connection."""
         super().chdir(path)
-        self._session.cwd(str(super().getcwd()))
+        if self.is_open:
+            self._session.cwd(str(super().getcwd()))
 
     def _download(self, remote_path, local_path):
         assert self.is_open
@@ -352,8 +350,7 @@ class ftp_connection(fs_connection):
         path = self.check_path(path)
 
         dir_path, file_name = os.path.split(path)
-        with Path(dir_path, self):
-            return self._session.size(file_name)
+        return self._session.size(path)
 
     def modified_time(self, path):
         """
@@ -450,8 +447,27 @@ class ftp_connection(fs_connection):
 
         # noinspection PyBroadException
         try:
-            with Path(path, self):
-                self.size(path)
-                return not self.is_dir(path)
+            self.size(path)
+            return not self.is_dir(path)
         except Exception:
             return False
+
+    def join(self, *path_elements):
+        """
+        Join several path elements together into a single path.
+
+        :param path_elements: The path elements to join.
+        :return: The resulting path.
+        """
+        if path_elements:
+            # There is a known Python bug which causes any TypeError raised by a generator during
+            # argument interpolation with * to be incorrectly reported as:
+            #       TypeError: join() argument after * must be a sequence, not generator
+            # The bug is documented at:
+            #       https://mail.python.org/pipermail/new-bugs-announce/2009-January.txt
+            # To avoid this confusing misrepresentation of errors, I have broken this section out
+            # into multiple statements so TypeErrors get the opportunity to propagate correctly.
+            path_elements = tuple(self.check_path(element).strip('/\\') for element in path_elements)
+            return Path('/'.join(path_elements), connection=self)
+        else:
+            return Path(connection=self)

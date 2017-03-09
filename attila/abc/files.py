@@ -762,7 +762,7 @@ class Path(Configurable):
 
         try:
             listing = self.list()
-        except OSError as exc:
+        except Exception as exc:
             if onerror is not None:
                 onerror(exc)
         else:
@@ -883,7 +883,7 @@ class FSConnector(Connector, Configurable, metaclass=ABCMeta):
         """Create a new connection and return it."""
         result = super().connect(*args, **kwargs)
         if self._initial_cwd is not None:
-            result.chdir(self._initial_cwd)
+            result.cwd = self._initial_cwd
         return result
 
 
@@ -985,6 +985,11 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
     def push_cwd(self, path):
         path = Path(self.check_path(path), self)
         self._cwd_stack.append(path)
+        try:
+            self.chdir(path)
+        except:
+            self._cwd_stack.pop()
+            raise
 
     def pop_cwd(self):
         if not self._cwd_stack:
@@ -992,7 +997,9 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
         elif len(self._cwd_stack) == 1:
             return self._cwd_stack[-1]
         else:
-            return self._cwd_stack.pop()
+            result = self._cwd_stack.pop()
+            self.chdir(self._cwd_stack[-1])
+            return result
 
     def check_path(self, path):
         """
