@@ -213,6 +213,8 @@ class ftp_connection(fs_connection):
         """Open the FTP connection."""
         assert not self.is_open
 
+        cwd = self.getcwd()
+
         user, password, _ = self._connector.credential
 
         self._session = ftplib.FTP()
@@ -220,9 +222,13 @@ class ftp_connection(fs_connection):
         self._session.connect(self._connector.server, self._connector.port)
         self._session.login(user, password or '')
 
-        cwd = self.getcwd()
         super().open()
-        self.chdir(cwd)
+        if cwd is None:
+            # This forces the CWD to be refreshed.
+            self.getcwd()
+        else:
+            # This overrides the CWD based on what it was set to before the connection was opened.
+            self.chdir(cwd)
 
     def close(self):
         """Close the FTP connection"""
@@ -349,7 +355,6 @@ class ftp_connection(fs_connection):
         assert self.is_open
         path = self.check_path(path)
 
-        dir_path, file_name = os.path.split(path)
         return self._session.size(path)
 
     def modified_time(self, path):
@@ -448,7 +453,7 @@ class ftp_connection(fs_connection):
         # noinspection PyBroadException
         try:
             self.size(path)
-            return not self.is_dir(path)
+            return True
         except Exception:
             return False
 
@@ -467,7 +472,10 @@ class ftp_connection(fs_connection):
             #       https://mail.python.org/pipermail/new-bugs-announce/2009-January.txt
             # To avoid this confusing misrepresentation of errors, I have broken this section out
             # into multiple statements so TypeErrors get the opportunity to propagate correctly.
+            starting_slash = path_elements and str(path_elements[0]).startswith('/')
             path_elements = tuple(self.check_path(element).strip('/\\') for element in path_elements)
+            if starting_slash:
+                path_elements = ('',) + path_elements
             return Path('/'.join(path_elements), connection=self)
         else:
             return Path(connection=self)
