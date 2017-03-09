@@ -33,7 +33,8 @@ __packages__ = [
     'attila.fs',
     'attila.generation',
     'attila.notifications',
-    'attila.security'
+    'attila.security',
+    'test_attila',
 ]
 __package_data__ = {
     'attila': ['attila.ini'],
