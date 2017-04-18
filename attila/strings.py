@@ -662,8 +662,11 @@ def to_list_of_strings(items, normalizer=None):
     if not items:
         return []
     if isinstance(items, str):
-        # Split by commas, pipes, and/or semicolons
-        items = re.split(',|;', items)
+        if '\n' in items:
+            items = items.splitlines()
+        else:
+            # Split by commas, pipes, and/or semicolons
+            items = re.split('|,;', items)
     else:
         items = list(items)
 

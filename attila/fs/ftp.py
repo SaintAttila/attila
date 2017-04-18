@@ -66,9 +66,12 @@ class FTPConnector(FSConnector):
         scheme, netloc, path, params, query, fragment = urlparse(url)
         assert not params and not query and not fragment
         assert scheme.lower() == 'ftp'
-        assert '@' in netloc
 
-        user, address = netloc.split('@')
+        if '@' in netloc:
+            user, address = netloc.split('@')
+        else:
+            user = None
+            address = netloc
 
         if ':' in address:
             server, port = address.split(':')
@@ -77,11 +80,14 @@ class FTPConnector(FSConnector):
             server = address
             port = DEFAULT_FTP_PORT
 
-        # We do not permit passwords to be stored in plaintext in the parameter value.
-        assert ':' not in user
+        if user:
+            # We do not permit passwords to be stored in plaintext in the parameter value.
+            assert ':' not in user
 
-        credential_string = user + '@' + server + '/ftp'
-        credential = manager.load_value(credential_string, credentials.Credential)
+            credential_string = user + '@' + server + '/ftp'
+            credential = manager.load_value(credential_string, credentials.Credential)
+        else:
+            credential = None
 
         return Path(path, cls(server + ':' + str(port), credential).connect())
 
@@ -117,11 +123,12 @@ class FTPConnector(FSConnector):
             **kwargs
         )
 
-    def __init__(self, server, credential, passive=True, initial_cwd=None):
+    def __init__(self, server, credential=None, passive=True, initial_cwd=None):
         verify_type(server, str, non_empty=True)
         server, port = strings.split_port(server, DEFAULT_FTP_PORT)
 
-        assert credential.user
+        if credential:
+            assert credential.user
 
         verify_type(passive, bool)
 
@@ -215,12 +222,13 @@ class ftp_connection(fs_connection):
 
         cwd = self.getcwd()
 
-        user, password, _ = self._connector.credential
-
         self._session = ftplib.FTP()
         self._session.set_pasv(self._connector.passive)
         self._session.connect(self._connector.server, self._connector.port)
-        self._session.login(user, password or '')
+
+        if self._connector.credential:
+            user, password, _ = self._connector.credential
+            self._session.login(user, password or '')
 
         super().open()
         if cwd is None:

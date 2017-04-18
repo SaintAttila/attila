@@ -179,7 +179,7 @@ class Path(Configurable):
         else:
             return type(self).__name__ + repr((str(self), self._connection))
 
-    def __abs__(self):
+    def __abs__(self) -> 'Path':
         return self._connection.abs_path(self)
 
     def __hash__(self):
@@ -292,7 +292,7 @@ class Path(Configurable):
     def __len__(self):
         return len(self.list())
 
-    def __getitem__(self, item):
+    def __getitem__(self, item) -> 'Path':
         verify_type(item, (str, Path))
         result = self._connection.join(self, item)
         assert isinstance(result, Path)
