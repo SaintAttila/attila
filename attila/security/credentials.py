@@ -44,7 +44,13 @@ class Credential(Configurable):
         verify_type(user, str, non_empty=True)
         verify_type(domain, str, non_empty=True)
 
-        password = passwords.get_password(domain, user)
+        try:
+            password = passwords.get_password(domain, user)
+        except KeyError:
+            if user.lower() in ('anon', 'anonymous'):
+                password = ''
+            else:
+                raise
         return cls(*args, user=user, password=password, domain=domain, **kwargs)
 
     @classmethod
