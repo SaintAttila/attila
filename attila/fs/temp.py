@@ -95,6 +95,16 @@ class TempFile:
         """Is the file a TTY file."""
         return self._file_obj.isatty()
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+        return False
+
+    def __iter__(self):
+        return self
+
     def __next__(self):
         return next(self._file_obj)
 

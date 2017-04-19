@@ -192,7 +192,6 @@ class ADODBConnector(sql.SQLConnector, configurations.Configurable):
         database = parameter_map['database']
         driver = parameter_map.get('driver')
         trusted = parameter_map.get('trusted_connection')
-        user = parameter_map.get('uid')
         dialect = parameter_map.get('dialect')
 
         if trusted is not None:
@@ -200,12 +199,16 @@ class ADODBConnector(sql.SQLConnector, configurations.Configurable):
             assert trusted in ('true', 'false')
             trusted = (trusted == 'true')
 
-        if user is not None:
-            credential_string = user + '@' + server + '/adodb'
-            credential = \
-                manager.load_value(credential_string, credentials.Credential)
-        else:
+        if trusted:
             credential = None
+        else:
+            user = parameter_map.get('uid')
+            if user is not None:
+                credential_string = user + '@' + server + '/adodb'
+                credential = \
+                    manager.load_value(credential_string, credentials.Credential)
+            else:
+                credential = None
 
         return cls(
             *args,
@@ -238,13 +241,16 @@ class ADODBConnector(sql.SQLConnector, configurations.Configurable):
         trusted = manager.load_option(section, 'trusted', 'bool', default=None)
         dialect = manager.load_option(section, 'dialect', str, default=None)
 
-        credential = manager.load_option(section, 'credential',
-                                         credentials.Credential,
-                                         default=None)
-        if credential is None:
-            credential = manager.load_section(section,
-                                              loader=credentials.Credential,
-                                              default=None)
+        if trusted:
+            credential = None
+        else:
+            credential = manager.load_option(section, 'credential',
+                                             credentials.Credential,
+                                             default=None)
+            if credential is None:
+                credential = manager.load_section(section,
+                                                  loader=credentials.Credential,
+                                                  default=None)
 
         return cls(
             *args,
@@ -333,7 +339,7 @@ class ADODBConnector(sql.SQLConnector, configurations.Configurable):
         result = \
             "Driver={%s};Server={%s};Database={%s}" % (self._driver, self._server, self._database)
         if self._credential:
-            user, password = self._credential
+            user, password = self._credential[:2]
             result += ";Uid={%s};Pwd={%s}" % (user, password)
         if self._trusted is not None:
             result += ";Trusted_Connection=%s" % repr(self._trusted)

@@ -58,7 +58,8 @@ class install(_install):
                 module = SourceFileLoader(package_name, import_path).load_module()
             except Exception:
                 # We couldn't import it, so we definitely can't call the post-install hook.
-                warnings.warn("Unable to load the module to run post-install hooks. Configuration"
+                traceback.print_exc()
+                warnings.warn("Unable to load the module to run post-install hooks. Configuration "
                               "files will have to be copied manually, and functions labeled with "
                               "the '@post_install' decorator will need to be called manually.")
                 return result

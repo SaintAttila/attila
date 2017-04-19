@@ -700,6 +700,15 @@ class auto_context:
             warnings.warn("The file %s already exists and was not updated." % abs(preferred_config_path))
 
     @property
+    def start_time(self):
+        """
+        The time the automation started.
+
+        :return: A datetime.datetime instance.
+        """
+        return self._start_time
+
+    @property
     def automation_root(self):
         """
         The root folder for all automations.

@@ -15,6 +15,7 @@ import re
 
 
 from .abc.configurations import Configurable
+from .abc.files import Path
 from .configurations import ConfigManager
 from .exceptions import verify_type, OperationNotSupportedError
 from .plugins import config_loader
@@ -78,7 +79,7 @@ def parse_bool(string, default=NotImplemented):
     elif not upper and default is not NotImplemented:
         return default
     else:
-        raise ValueError("Unrecognized Boolean string: %s" % repr(string))
+        raise ValueError("Unrecognized Boolean string: %r" % string)
 
 
 @config_loader('char')
@@ -111,7 +112,7 @@ def parse_char(string, default=NotImplemented):
     result = str(result)
 
     if len(result) != 1:
-        raise ValueError("Could not interpret string as character: " + repr(string))
+        raise ValueError("Could not interpret string as character: %r" % string)
 
     return result
 
@@ -135,9 +136,23 @@ def parse_int(string, default=NotImplemented):
     # ast.literal_eval() lets us use things like '1234 + 5678', and not just straight digits.
     result = ast.literal_eval(string)
     if not isinstance(result, int):
-        raise ValueError("Could not interpret string as integer: " + repr(string))
+        raise ValueError("Could not interpret string as integer: %r" % string)
 
     return result
+
+
+@config_loader('number')
+def parse_number(string):
+    """
+    Parses a number from a string. Returns either an integer or a float.
+
+    :param string: The string to be parsed.
+    :return: The integer or float that was parsed from the string.
+    """
+    value = ast.literal_eval(string)
+    if not isinstance(value, (int, float)):
+        raise ValueError("Could not interpret string as a number: %r" % string)
+    return value
 
 
 def format_currency(amount, commas=True, currency_sign='$', exact=True, negative_parens=False):
@@ -517,6 +532,87 @@ def parse_date(string, parser=None):
     return date_and_time.date()
 
 
+# TODO: Add a time parser that assumes the current day as the date.
+
+
+@config_loader('timedelta')
+def parse_timedelta(string):
+    """
+    Parses a timedelta from a string. The string is expected to consist of a list of amount/unit pairs. Separating
+    commas and the word 'and' are optional. The amount defaults to 1 if no value is provided. Accepted units are:
+        * days
+        * seconds
+        * microseconds
+        * milliseconds
+        * minutes
+        * hours
+        * weeks
+    Non-pluralized forms and some abbreviations are also accepted.
+
+    IMPORTANT: The abbreviation m is treated as minutes, NOT MONTHS. The month unit is not accepted, because months
+    vary in duration.
+
+    Examples:
+        1 day, 12 hours
+        2 hours, 30 minutes and 10 seconds
+        2 hours 2 days 1 week
+
+    :param string: The string to be parsed.
+    :return: A datetime.timedelta instance.
+    """
+    unit_map = {
+        'day': datetime.timedelta(days=1),
+        'days': datetime.timedelta(days=1),
+        'd': datetime.timedelta(days=1),
+        'seconds': datetime.timedelta(seconds=1),
+        'second': datetime.timedelta(seconds=1),
+        'sec': datetime.timedelta(seconds=1),
+        's': datetime.timedelta(seconds=1),
+        'microseconds': datetime.timedelta(microseconds=1),
+        'microsecond': datetime.timedelta(microseconds=1),
+        'micro': datetime.timedelta(microseconds=1),
+        'milliseconds': datetime.timedelta(milliseconds=1),
+        'millisecond': datetime.timedelta(milliseconds=1),
+        'milli': datetime.timedelta(milliseconds=1),
+        'ms': datetime.timedelta(milliseconds=1),
+        'minutes': datetime.timedelta(minutes=1),
+        'minute': datetime.timedelta(minutes=1),
+        'min': datetime.timedelta(minutes=1),
+        'm': datetime.timedelta(minutes=1),
+        'hours': datetime.timedelta(hours=1),
+        'hour': datetime.timedelta(hours=1),
+        'h': datetime.timedelta(hours=1),
+        'weeks': datetime.timedelta(weeks=1),
+        'week': datetime.timedelta(weeks=1),
+        'w': datetime.timedelta(weeks=1),
+    }
+
+    amount = None
+    total = datetime.timedelta(0)
+    for token in string.split():
+        token = token.lower().strip(',')
+        if not token:
+            continue
+        elif token == 'and':
+            if amount is not None:
+                raise ValueError("Expected a unit name/abbreviation. Token: %r String: %r" % (token, string))
+            continue
+        if token.isalpha():
+            if token not in unit_map:
+                raise ValueError("Unrecognized unit name/abbreviation. Token: %r String: %r" % (token, string))
+            if amount is None:
+                amount = 1
+            total += amount * unit_map[token]
+            amount = None
+        else:
+            if amount is not None:
+                raise ValueError("Expected a unit name/abbreviation. Token: %r String: %r" % (token, string))
+            amount = parse_number(token)
+    if amount is not None:
+        raise ValueError("Unexpected end of input. String: %r" % string)
+    return total
+
+
 def split_port(ip_port, default=None):
     """
     Split an IP:port pair.
@@ -557,7 +653,7 @@ def parse_log_level(string):
 def to_list_of_strings(items, normalizer=None):
     """
     Convert a parameter value, which may be None, a delimited string, or a sequence of non-delimited
-    strings, into a list of unique, non-empty, non-delimited strings.
+    strings, into a list of non-empty, non-delimited strings.
 
     :param items: The set of items, in whatever form they may take.
     :param normalizer: A function which normalizes the items.
@@ -566,15 +662,39 @@ def to_list_of_strings(items, normalizer=None):
     if not items:
         return []
     if isinstance(items, str):
-        # Split by commas, pipes, and/or semicolons
-        items = re.split(',|;', items)
+        if '\n' in items:
+            items = items.splitlines()
+        else:
+            # Split by commas, pipes, and/or semicolons
+            items = re.split('|,;', items)
     else:
         items = list(items)
 
-    for item in items:
-        assert isinstance(item, str)
+        for index, item in enumerate(items):
+            if isinstance(item, Path):
+                items[index] = str(item)
+            else:
+                assert isinstance(item, str)
 
     if normalizer:
         items = [normalizer(item) for item in items if item.strip()]
 
     return [item.strip() for item in items if item.strip()]
+
+
+@config_loader('lines')
+def to_list_of_lines(string, normalizer=None):
+    """
+    Convert a parameter value, which may be None or a string, into a list of non-empty strings by splitting on newlines.
+
+    :param string: The original string.
+    :param normalizer: A function which normalizes the items, e.g. str.upper.
+    :return: The separated, normalized items, in a list.
+    """
+    verify_type(string, str, allow_none=True)
+    if not string:
+        return []
+    if normalizer:
+        return [normalizer(line.strip()) for line in string.splitlines() if line.strip()]
+    else:
+        return [line.strip() for line in string.splitlines() if line.strip()]

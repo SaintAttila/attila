@@ -30,7 +30,10 @@ class ProxyFile(TempFile):
             proxy_path = Path(proxy_path, local_fs_connection())
         else:
             assert isinstance(proxy_path, Path)
-        path.copy_to(proxy_path)
+
+        # TODO: Verify that removing this line didn't break anything. It was causing infinite recursion.
+        # path.copy_to(proxy_path)
+
         super().__init__(proxy_path, *args, **kwargs)
         self._original_path = path
         self._writeback = writeback

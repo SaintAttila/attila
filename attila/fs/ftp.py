@@ -6,6 +6,7 @@ FTP file system support
 import ftplib
 import os
 import socket
+import time
 
 from distutils.util import strtobool
 from urllib.parse import urlparse
@@ -17,7 +18,7 @@ from . import local
 from ..abc.files import Path, FSConnector, fs_connection
 
 from ..configurations import ConfigManager
-from ..exceptions import verify_type
+from ..exceptions import verify_type, OperationNotSupportedError
 from ..plugins import config_loader, url_scheme
 from ..security import credentials
 from .proxies import ProxyFile
@@ -31,6 +32,8 @@ __all__ = [
 
 
 DEFAULT_FTP_PORT = 21
+INT_TIME_FORMAT = '%Y%m%d%H%M%S'
+FLOAT_TIME_FORMAT = '%Y%m%d%H%M%S.%f'
 
 
 @config_loader
@@ -63,9 +66,12 @@ class FTPConnector(FSConnector):
         scheme, netloc, path, params, query, fragment = urlparse(url)
         assert not params and not query and not fragment
         assert scheme.lower() == 'ftp'
-        assert '@' in netloc
 
-        user, address = netloc.split('@')
+        if '@' in netloc:
+            user, address = netloc.split('@')
+        else:
+            user = None
+            address = netloc
 
         if ':' in address:
             server, port = address.split(':')
@@ -74,11 +80,14 @@ class FTPConnector(FSConnector):
             server = address
             port = DEFAULT_FTP_PORT
 
-        # We do not permit passwords to be stored in plaintext in the parameter value.
-        assert ':' not in user
+        if user:
+            # We do not permit passwords to be stored in plaintext in the parameter value.
+            assert ':' not in user
 
-        credential_string = user + '@' + server + '/ftp'
-        credential = manager.load_value(credential_string, credentials.Credential)
+            credential_string = user + '@' + server + '/ftp'
+            credential = manager.load_value(credential_string, credentials.Credential)
+        else:
+            credential = None
 
         return Path(path, cls(server + ':' + str(port), credential).connect())
 
@@ -114,11 +123,12 @@ class FTPConnector(FSConnector):
             **kwargs
         )
 
-    def __init__(self, server, credential, passive=True, initial_cwd=None):
+    def __init__(self, server, credential=None, passive=True, initial_cwd=None):
         verify_type(server, str, non_empty=True)
         server, port = strings.split_port(server, DEFAULT_FTP_PORT)
 
-        assert credential.user and credential.password
+        if credential:
+            assert credential.user
 
         verify_type(passive, bool)
 
@@ -210,12 +220,23 @@ class ftp_connection(fs_connection):
         """Open the FTP connection."""
         assert not self.is_open
 
-        user, password = self._connector.credential
+        cwd = self.getcwd()
 
         self._session = ftplib.FTP()
         self._session.set_pasv(self._connector.passive)
         self._session.connect(self._connector.server, self._connector.port)
-        self._session.login(user, password)
+
+        if self._connector.credential:
+            user, password, _ = self._connector.credential
+            self._session.login(user, password or '')
+
+        super().open()
+        if cwd is None:
+            # This forces the CWD to be refreshed.
+            self.getcwd()
+        else:
+            # This overrides the CWD based on what it was set to before the connection was opened.
+            self.chdir(cwd)
 
     def close(self):
         """Close the FTP connection"""
@@ -230,17 +251,19 @@ class ftp_connection(fs_connection):
             self._session = None  # The close your eyes and pretend way
             self._is_open = False
 
-    @property
-    def cwd(self):
-        """The current working directory of this FTP connection."""
-        assert self.is_open
-        return Path(self._session.pwd(), self)
+    def getcwd(self):
+        """Get the current working directory of this FTP connection."""
+        if self.is_open:
+            super().chdir(self._session.pwd())
+            return super().getcwd()
 
-    @cwd.setter
-    def cwd(self, path):
-        assert self.is_open
-        path = self.check_path(path)
-        self._session.cwd(path)
+        return super().getcwd()
+
+    def chdir(self, path):
+        """Set the current working directory of this FTP connection."""
+        super().chdir(path)
+        if self.is_open:
+            self._session.cwd(str(super().getcwd()))
 
     def _download(self, remote_path, local_path):
         assert self.is_open
@@ -250,7 +273,7 @@ class ftp_connection(fs_connection):
         dir_path, file_name = os.path.split(remote_path)
 
         with Path(dir_path, self):
-            with open(abs(local_path), 'wb') as local_file:
+            with open(local_path, 'wb') as local_file:
                 self._session.retrbinary("RETR " + file_name, local_file.write)
 
     def _upload(self, local_path, remote_path):
@@ -261,7 +284,7 @@ class ftp_connection(fs_connection):
         dir_path, file_name = os.path.split(remote_path)
 
         with Path(dir_path, self):
-            with open(abs(local_path), 'rb') as local_file:
+            with open(local_path, 'rb') as local_file:
                 self._session.retrbinary("STOR " + file_name, local_file)
 
     def open_file(self, path, mode='r', buffering=-1, encoding=None, errors=None, newline=None,
@@ -286,7 +309,8 @@ class ftp_connection(fs_connection):
 
         # We can't work directly with an FTP file. Instead, we will create a temp file and return it
         # as a proxy.
-        temp_path = local.local_fs_connection.get_temp_file_path(self.name(path))
+        with local.local_fs_connection() as connection:
+            temp_path = str(abs(connection.get_temp_file_path(self.name(path))))
 
         # If we're not truncating the file, then we'll need to copy down the data.
         if mode not in ('w', 'wb'):
@@ -319,6 +343,10 @@ class ftp_connection(fs_connection):
                     listing = []
                 else:
                     raise
+            # We have to do this because we can't check if path is a directory,
+            # and if we call nlst on a file name, sometimes it will just return
+            # that file name in the list instead of bombing out.
+            listing = [name for name in listing if self.exists(path[name])]
         if pattern == '*':
             return listing
         else:
@@ -335,9 +363,34 @@ class ftp_connection(fs_connection):
         assert self.is_open
         path = self.check_path(path)
 
-        dir_path, file_name = os.path.split(path)
-        with Path(dir_path, self):
-            return self._session.size(file_name)
+        return self._session.size(path)
+
+    def modified_time(self, path):
+        """
+        Get the last time the data of file system object was modified.
+
+        :param path: The path to operate on.
+        :return: The time stamp, as a float.
+        """
+        assert self.is_open
+        path = Path(self.check_path(path), self)
+        with Path(path.dir):
+            result = self._session.sendcmd('MDTM %s' % path.name)
+            response_code = result.split()[0]
+            if response_code != '213':
+                if path.exists:
+                    raise OperationNotSupportedError()
+                else:
+                    raise FileNotFoundError()
+            timestamp = result.split()[-1]
+            if '.' in timestamp:
+                time_format = INT_TIME_FORMAT
+            else:
+                time_format = FLOAT_TIME_FORMAT
+            try:
+                return time.mktime(time.strptime(timestamp, time_format))
+            except ValueError as exc:
+                raise OperationNotSupportedError() from exc
 
     def remove(self, path):
         """
@@ -382,7 +435,16 @@ class ftp_connection(fs_connection):
         # noinspection PyBroadException
         try:
             with Path(path, self):
-                return True
+                try:
+                    self._session.nlst()
+                except Exception as exc:
+                    # Some FTP servers give an error if the directory is empty.
+                    if '550 No files found.' in str(exc):
+                        return True
+                    else:
+                        return False
+                else:
+                    return True
         except Exception:
             return False
 
@@ -402,3 +464,26 @@ class ftp_connection(fs_connection):
             return True
         except Exception:
             return False
+
+    def join(self, *path_elements):
+        """
+        Join several path elements together into a single path.
+
+        :param path_elements: The path elements to join.
+        :return: The resulting path.
+        """
+        if path_elements:
+            # There is a known Python bug which causes any TypeError raised by a generator during
+            # argument interpolation with * to be incorrectly reported as:
+            #       TypeError: join() argument after * must be a sequence, not generator
+            # The bug is documented at:
+            #       https://mail.python.org/pipermail/new-bugs-announce/2009-January.txt
+            # To avoid this confusing misrepresentation of errors, I have broken this section out
+            # into multiple statements so TypeErrors get the opportunity to propagate correctly.
+            starting_slash = path_elements and str(path_elements[0]).startswith('/')
+            path_elements = tuple(self.check_path(element).strip('/\\') for element in path_elements)
+            if starting_slash:
+                path_elements = ('',) + path_elements
+            return Path('/'.join(path_elements), connection=self)
+        else:
+            return Path(connection=self)

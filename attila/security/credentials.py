@@ -21,17 +21,11 @@ __all__ = [
 
 
 @config_loader
-class Credential(collections.namedtuple('Credential', 'user password domain'), Configurable):
+class Credential(Configurable):
     """
     A Credential is a user/password pair. It's handy for passing around to reduce the number of
     required parameters in function calls.
     """
-
-    # These are here so PyCharm will notice the properties exist. It doesn't handle named tuples
-    # perfectly.
-    user = None
-    password = None
-    domain = None
 
     @classmethod
     def load_config_value(cls, manager, value, *args, **kwargs):
@@ -46,12 +40,18 @@ class Credential(collections.namedtuple('Credential', 'user password domain'), C
         assert isinstance(manager, ConfigManager)
         verify_type(value, str, non_empty=True)
 
-        user, system_name = value.split('@')
+        user, domain = value.split('@')
         verify_type(user, str, non_empty=True)
-        verify_type(system_name, str, non_empty=True)
+        verify_type(domain, str, non_empty=True)
 
-        password = passwords.get_password(system_name, user)
-        return cls(*args, user=user, password=password, **kwargs)
+        try:
+            password = passwords.get_password(domain, user)
+        except KeyError:
+            if user.lower() in ('anon', 'anonymous'):
+                password = ''
+            else:
+                raise
+        return cls(*args, user=user, password=password, domain=domain, **kwargs)
 
     @classmethod
     def load_config_section(cls, manager, section, *args, **kwargs):
@@ -88,8 +88,12 @@ class Credential(collections.namedtuple('Credential', 'user password domain'), C
         super().__init__()
 
         assert user is None or (user and isinstance(user, str))
-        assert password is None or (password and isinstance(password, str))
+        assert not password or isinstance(password, str)
         assert domain is None or (domain and isinstance(domain, str))
+
+        self._user = user
+        self._password = password or None
+        self._domain = domain
 
     def __bool__(self):
         return self.user is not None or self.password is not None
@@ -99,6 +103,18 @@ class Credential(collections.namedtuple('Credential', 'user password domain'), C
         """Whether all required elements were provided."""
         return self.user is not None and self.password is not None and self.domain is not None
 
+    @property
+    def user(self):
+        return self._user
+
+    @property
+    def password(self):
+        return self._password
+
+    @property
+    def domain(self):
+        return self._domain
+
     def __str__(self):
         # We hide the password on purpose, to prevent accidentally displaying it. If you really want
         # it, construct the string yourself.
@@ -107,5 +123,28 @@ class Credential(collections.namedtuple('Credential', 'user password domain'), C
     def __repr__(self):
         # We hide the password on purpose, to prevent accidentally displaying it. If you really want
         # it, construct the string yourself.
-        return \
-            type(self).__name__ + "(" + repr(self.user) + ", '********', " + repr(self.domain) + ")"
+        return type(self).__name__ + "(" + repr(self.user) + ", '********', " + repr(self.domain) + ")"
+
+    def __eq__(self, other):
+        if not isinstance(other, Credential):
+            return NotImplemented
+        return self._user == other._user and self._password == other._password and self._domain == other._domain
+
+    def __ne__(self, other):
+        if not isinstance(other, Credential):
+            return NotImplemented
+        return not (self._user == other._user and self._password == other._password and self._domain == other._domain)
+
+    def __hash__(self):
+        return hash((self._user, self._password, self._domain))
+
+    def __iter__(self):
+        yield self._user
+        yield self._password
+        yield self._domain
+
+    def __len__(self):
+        return 3
+
+    def __getitem__(self, item):
+        return (self._user, self._password, self._domain)[item]

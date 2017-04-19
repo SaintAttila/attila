@@ -128,6 +128,7 @@ def get_default_config_search_dirs(file_name_base=None):
         '~/.config/attila',
         '/etc/attila',
         os.path.dirname(__file__),
+        os.path.join(os.path.dirname(os.path.dirname(__file__)), file_name_base) if file_name_base else None
     ]
     base_paths = [base_path for base_path in base_paths if base_path is not None]
     if file_name_base is not None:
