@@ -384,9 +384,9 @@ class ftp_connection(fs_connection):
                     raise FileNotFoundError()
             timestamp = result.split()[-1]
             if '.' in timestamp:
-                time_format = INT_TIME_FORMAT
-            else:
                 time_format = FLOAT_TIME_FORMAT
+            else:
+                time_format = INT_TIME_FORMAT
             try:
                 return time.mktime(time.strptime(timestamp, time_format))
             except ValueError as exc:
