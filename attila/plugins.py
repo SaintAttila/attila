@@ -64,11 +64,9 @@ class PluginGroup(Mapping):
         """
         verify_type(name, str, non_empty=True)
         if name.lower() in self._registry and self._registry[name.lower()] != value:
-            raise PluginExistsError("Another plugin by this name has already been registered: %s" %
-                                    name)
+            raise PluginExistsError("Another plugin by this name has already been registered: %s" % name)
         if self._value_type is not None and not isinstance(value, self._value_type):
-            raise InvalidPluginError("Plugin %s is not a/an %s." %
-                                     (name, self._value_type.__name__))
+            raise InvalidPluginError("Plugin %s is not a/an %s." % (name, self._value_type.__name__))
         self._original_names[name] = name
         self._registry[name.lower()] = value
 
