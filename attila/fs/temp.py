@@ -21,11 +21,11 @@ class TempFile:
     """
 
     def __init__(self, path, *args, **kwargs):
-        assert isinstance(path, Path)
-        assert path.exists
         self._path = path
         self._file_obj = path.open(*args, **kwargs)
         self._modified = False
+        assert isinstance(path, Path)
+        assert path.exists
 
     def __del__(self):
         self.close()
@@ -76,11 +76,17 @@ class TempFile:
         """
         try:
             if self._file_obj is not None:
-                self.flush()  # Provides a hook for proxy writebacks.
-                self._file_obj.close()
+                try:
+                    self.flush()  # Provides a hook for proxy writebacks.
+                finally:
+                    self._file_obj.close()
         finally:
             self._file_obj = None
-            self._path.discard()
+            if hasattr(self, '_path'):
+                # If we get an error early enough, __del__ gets called,
+                # which calls this function. Hence we have to check if
+                # the attribute exists first.
+                self._path.discard()
 
     def flush(self):
         """Flush pending writes to disk."""
