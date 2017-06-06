@@ -667,7 +667,7 @@ def to_list_of_strings(items, normalizer=None):
             items = items.splitlines()
         else:
             # Split by commas, pipes, and/or semicolons
-            items = re.split('|,;', items)
+            items = re.split('[|,;]', items)
     else:
         items = list(items)
 
