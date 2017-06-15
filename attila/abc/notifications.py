@@ -4,6 +4,7 @@ Interface definition for notifiers.
 
 
 import datetime
+import string
 
 
 from abc import ABCMeta, abstractmethod
@@ -40,13 +41,23 @@ class Notifier(metaclass=ABCMeta):
         verify_type(template, str)
         verify_type(kwargs, (dict, defaultdict))
 
-        kwargs = defaultdict(lambda: None, **kwargs)
-
         # TODO: Other defaults?
         if 'time' not in kwargs:
             kwargs.update(time=datetime.datetime.now())
 
-        return template.format(*args, **kwargs)
+        # The defaultdict class doesn't work with str.format,
+        # so we have to parse it ourselves and add the keys.
+        formatter = string.Formatter()
+        for _, name, _, _ in formatter.parse(template):
+            if name and name not in kwargs:
+                kwargs[name] = None
+
+        # noinspection PyBroadException
+        try:
+            return template.format(*args, **kwargs)
+        except Exception:
+            # It's important that this never fails because it's used to report errors.
+            return template + ' (args: %r, kwargs: %r)' % (args, kwargs)
 
     @abstractmethod
     def __call__(self, *args, attachments=None, **kwargs):
