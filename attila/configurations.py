@@ -292,7 +292,7 @@ class ConfigManager:
                 if fallback.has_loader(name):
                     return fallback.get_loader(name, default)
             if default is NotImplemented:
-                raise KeyError(name)
+                raise KeyError("Unrecognized loader: %r" % name)
             return default
 
     def set_url_scheme(self, name, scheme):
@@ -347,7 +347,7 @@ class ConfigManager:
                 if fallback.has_url_scheme(name):
                     return fallback.get_url_scheme(name, default)
             if default is NotImplemented:
-                raise KeyError(name)
+                raise KeyError("Unrecognized URL scheme: %r" % name)
             return default
 
     def set_section(self, section, content):
@@ -440,7 +440,7 @@ class ConfigManager:
             if found:
                 return results
             elif default is NotImplemented:
-                raise KeyError(section)
+                raise KeyError("Section not found: %r" % section)
             else:
                 return default
 
@@ -590,9 +590,10 @@ class ConfigManager:
                         else:
                             return self.interpolate(value, section)
             except Exception as exc:
-                raise KeyError(section, option) from exc
+                raise KeyError("Error while trying to get the value of option %r in section %s." %
+                               (option, section)) from exc
             if default is NotImplemented:
-                raise KeyError(section, option)
+                raise KeyError("Section/option pair not found: %r, %r" % (section, option))
             return default
 
     def _load_object(self, value, loader=None):
@@ -699,7 +700,7 @@ class ConfigManager:
 
         if not content:
             if default is NotImplemented:
-                raise KeyError(section, option)
+                raise KeyError("Section/option pair not found: %r, %r" % (section, option))
             else:
                 return default
 
@@ -726,7 +727,8 @@ class ConfigManager:
                 else:
                     result = loader(content)
             except Exception as exc:
-                raise KeyError(section, option) from exc
+                raise KeyError("Error while trying to load the value of option %r in section %s." %
+                               (option, section)) from exc
 
             self._loaded_instances[cache_key] = result
 
@@ -756,7 +758,7 @@ class ConfigManager:
             content = self.get_section(section)
         else:
             if default is NotImplemented:
-                raise KeyError(section)
+                raise KeyError("Section not found: %r" % section)
             else:
                 return default
 
@@ -788,7 +790,7 @@ class ConfigManager:
                 else:
                     result = loader(content)
             except Exception as exc:
-                raise KeyError(section) from exc
+                raise KeyError("Error while trying to load section %r." % section) from exc
 
             self._loaded_instances[cache_key] = result
 
