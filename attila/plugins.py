@@ -235,13 +235,13 @@ def url_scheme(name=NotImplemented, value=NotImplemented):
 
     Registering a URL scheme function under its own name::
 
-        @config_loader
+        @url_scheme
         def aptly_named_url_scheme(string):
             ...
 
     Registering a URL scheme function under a different name::
 
-        @config_loader('BetterConfigLoaderName')
+        @url_scheme('BetterURLSchemeName')
         def less_aptly_named_url_scheme(string):
             ...
 
