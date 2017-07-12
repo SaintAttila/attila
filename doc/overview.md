@@ -201,11 +201,210 @@ the package generation mechanisms can be controlled through the
 `[Code Generation]` sections in `attila.ini` or `automation.ini`.
 
 
+## Automation Context
+
+Attila provides a simple means for automations to access their working
+environments. The `@automation` decorator can be used with the `main`
+function to make this functionality available to your automation via
+`auto_context.current()`:
+
+    @automation
+    def main():
+        context = auto_context.current()
+
+The context object provides numerous properties that describe the automation's
+runtime environment:
+
+* `automation_root`: A `Path` object indicating the location of the "root" 
+  `.automation` folder.
+* `automation_start_notifier`, `automation_error_notifier`, 
+  `automation_end_notifier`: Each of these properties is a `Notifier` object 
+  which is used to automatically transmit notifications indicating the run-time
+  status of the automation. You will generally have no need to access these 
+  directly.
+* `data_dir`: A `Path` object indicating the location where persistent data
+  files for this automation should be stored.
+* `docs_dir`: A `Path` object indicating the location where this automation's
+  documentation should be stored.
+* `log_dir`: A `Path` object indicating the location where log files generated
+  by this automation should be written.
+* `manager`: A `ConfigManager` object through which the configuration
+  settings specific to the automation can be accessed.
+* `name`: A non-empty string indicating the name of the automation. This is
+  automatically determined by the name of the python package where the entry 
+  point (the `main` function) is located.
+* `root_dir`: A `Path` object indicating the location of the automation's
+  private "root" folder. This is the sub-folder of `.automation` which is named
+  after the automation and serves as its base of operations and the home of its
+  log files, persistent data files, temporary working files, and documentation.
+* `start_time`: A `datetime.datetime` instance indicating the time at which the
+  automation's execution began.
+* `subtask_start_notifier`, `subtask_success_notifier`, 
+  `subtask_failure_notifier`, `subtask_error_notifier`, `subtask_end_notifier`: 
+  Each of these properties is a `Notifier` object which is used to 
+  automatically transmit notifications indicating the run-time status of 
+  specific subtasks performed by the automation. You will generally have no 
+  need to access these directly.
+* `task_start_notifier`, `task_success_notifier`, `task_failure_notifier`, 
+  `task_error_notifier`, `task_end_notifier`: Each of these properties is a 
+  `Notifier` object which is used to automatically transmit notifications 
+  indicating the run-time status of specific tasks performed by the automation.
+  You will generally have no need to access these directly.
+* `testing`: A `bool` indicating whether the automation is being 
+  executed in "test mode" -- in which case the automation should not take any 
+  actions that could affect the production environment.
+* `version`: A non-empty string indicating the version of the automation.
+* `workspace`: A `Path` object indicating the location where temporary working
+  files should be located for this automation.
+
+
 ## Configuration Files
 
-TODO: Explain how configuration files work, and how to use them to best
-      effect. Don't forget to explain writing your own configuration
-      loaders.
+### Configuration File Structure
+
+Attila configuration files are structured according to the commonly supported
+[INI file format](https://en.wikipedia.org/wiki/INI_file). INI files consist 
+of "options" (AKA parameters) organized into named sections. A special DEFAULT
+section allows default values to be specified for all sections in a single
+location. Each section can then define its own values or fall back to the
+defaults. Section names are indicated by placing the name in square brackets, 
+`[]`. Option names and values are indicated by placing the name to the left of 
+an equal sign, `=`, or a colon `:`, and the value to the right of the 
+punctuation. Comments are indicated by a semicolon, `;`, or hash, `#`, and
+continue to the end of the line. Multi-line values for an option can be 
+specified by indenting the lines after the option name.
+
+Example:
+
+    [Section Name]
+    ; Comment
+    Option Name 1 = Option Value 1  ; Comment
+    # Comment
+    Option Name 2: Option Value 2
+    Multi-Line Option Name:
+        Line 1
+        Line 2
+        # Comment
+        Line 3
+
+### Configuration Hierarchy
+
+Attila takes this organization one step further. Configuration files can be
+organized into default hierarchies, where requests for configuration settings
+are passed on to fallback configuration files if they are not specified in
+the primary configuration file. The automation context automatically loads
+certain configuration files into the configuration hierarchy accessed through
+the `manager` property.
+
+If you have a configuration file located at `~/automation/automation.ini`, 
+this will be loaded at initialization time. We will refer to this configuration 
+as the *general configuration*.
+
+If your project has a file with extension `.ini` which is named after the 
+automation and located in the automation's root folder (e.g. 
+`~/.automation/your_automation/your_automation.ini`), this will be loaded at
+initialization time, immediately after the general configuration. We will 
+refer to this configuration as the *specific configuration*.
+
+You can also specify an additional configuration by passing it in as an
+argument to the `@automation` decorator. We will refer to this configuration
+as the *override configuration*.
+
+When you request an option or section from the context's `manager` property,
+Attila will first consult the override configuration, then the specific
+configuration, and finally the general configuration to determine the value
+to return, stopping at the first configuration which exists and defines the
+requested option or section. If none of the configurations defines the
+requested option or section, a `KeyError` will be raised.
+
+
+### Interpolation
+
+Attila configuration files also support value interpolation of four different
+types: simple interpolation, date/time interpolation, path interpolation, and 
+object interpolation.
+
+#### Simple Interpolation
+
+*Simple interpolation* consists of direct value replacement. The syntax
+has two forms, `${option}`, and `${section:option}`. With the section name
+omitted, the referenced option is assumed to appear in the same section as
+the one where it is referenced. When the section name is specified, the 
+indicated section will be consulted for the requested option. If the simple
+interpolation appears within surrounding text, its string value will be
+injected into the text at the location where the simple interpolation 
+appears. Multiple simple interpolations can appear within a single option's
+value.
+
+#### Date/Time Interpolation
+
+*Date/time interpolation* uses the date/time at which the option is first
+requested to interpolate a formatted date string into the option's value.
+The syntax is `${datetime_format_string}`, where `datetime_format_string`
+is a format string in Python's `datetime` formatting syntax, e.g. `%m/%d/%Y`.
+The `datetime` format must contain at least one percent sign, `%` or it will
+not be recognized as such. Date/time interpolation follows the same rules as
+simple interpolation regarding value injection.
+
+#### Path Interpolation
+
+Unlike simple and date/time interpolation, *path interpolation* allows an
+option to return a `Path` object as its value, rather than a simple string.
+Path interpolations require the appearance of a URL prefix, `scheme://`, where 
+`scheme` is the name of a registered URL scheme, e.g. `ftp`, `https`, or 
+`file`. The URL prefix must appear at the beginning of the option's value, and 
+the URL must take up the entirety of the option's value.
+
+#### Object Interpolation
+
+Like path interpolation, *object interpolation* allows a parameter to have a
+non-string value, and does not support string injection. The syntax for object
+interpolation is `@section_name`, where `section_name` is the name of another 
+section which determines the type and initialization parameters of a Python 
+object. If an option value contains an object interpolation specifier, the 
+object interpolation specifier must take up the entirety of the option's value 
+with no surrounding text or additional interpolation specifiers. The object 
+specified by the indicated section will be returned as the option's value. If 
+the same option's value is requested multiple times, the previously returned 
+object will be returned again; a new object is not created for subsequent 
+requests.
+
+#### Object Loaders
+
+The section referenced by an object interpolation must contain a `Type`
+option. This `Type` option indicates the name of the *loader* that is used to 
+construct the object represented by the section. When the object 
+interpolation's value is first requested, control will be handed off to to the 
+indicated loader to construct the object on the configuration manager's behalf.
+Subsequent requests for the section's corresponding object will return that
+same object again. This allows for the parameterization and lazy construction 
+of complex object structures which make multiple references to the same 
+underlying objects.
+ 
+Loaders must be pre-registered with the configuration management system before 
+they are used to load the options or sections that refer to them. Loaders can
+be registered at install-time via a plugin mechanism, or at run-time via the
+`@config_loader` decorator. To register a function or class via the plugin
+mechanism, your package should use the `attila.config_loader` entry point. 
+(See [this stack exchange question](
+https://stackoverflow.com/questions/774824/explain-python-entry-points)
+for an explanation of entry points.)
+
+A loader can be defined as either a simple function, or as a class which 
+inherits from the `Configurable` abstract base class. If your loader is
+a function, it should expect a single argument: The name of the section
+to be loaded. (Note that when requesting the value of an option from code, a 
+loader can be selected by passing its name to the configuration manager. In 
+this case, the entire original string value of the option, which may not be
+a section name, is passed to the loader instead.) If your loader is a class
+which inherits from `Configurable`, your class must implement the 
+`load_config_section` method, which is passed the configuration manager and
+the section name to be loaded as its arguments. Additionally, your class can 
+implement the `load_config_value` method, which handles cases where the loader
+is specifically requested by name from the calling code when loading an option.
+If you do not implement `load_config_value`, your loader can only be used to
+load sections, not options.
+
 
 ## Tasks and Subtasks
 
