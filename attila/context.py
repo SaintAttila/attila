@@ -472,7 +472,7 @@ class auto_context:
         return stack
 
     @classmethod
-    def root(cls, default=None):
+    def root(cls, default=None) -> 'auto_context':
         """Get the root automation context for this thread."""
         stack = cls._get_stack()
         if stack:
@@ -480,7 +480,7 @@ class auto_context:
         return default
 
     @classmethod
-    def current(cls, default=None):
+    def current(cls, default=None) -> 'auto_context':
         """Get the current automation context for this thread."""
         stack = cls._get_stack()
         if stack:
