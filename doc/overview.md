@@ -201,7 +201,7 @@ the package generation mechanisms can be controlled through the
 `[Code Generation]` sections in `attila.ini` or `automation.ini`.
 
 
-## Automation Context
+## Automation Configuration
 
 Attila provides a simple means for automations to access their working
 environments. The `@automation` decorator can be used with the `main`
@@ -215,13 +215,21 @@ function to make this functionality available to your automation via
 The context object provides numerous properties that describe the automation's
 runtime environment:
 
+TODO: Add information about the configuration options to each entry here.
+
 * `automation_root`: A `Path` object indicating the location of the "root" 
-  `.automation` folder.
+  `.automation` folder. This is configured via the `Automation Root` option in
+  the `Environment` section of `attila.ini`, and can be overridden in 
+  `automation.ini`. It defaults to `~/.automation`.
 * `automation_start_notifier`, `automation_error_notifier`, 
   `automation_end_notifier`: Each of these properties is a `Notifier` object 
   which is used to automatically transmit notifications indicating the run-time
   status of the automation. You will generally have no need to access these 
-  directly.
+  directly. They are configured via the `On Automation Start`, `On Automation 
+  Error`, and `On Automation End` options in the `Environment` section of your
+  `automation.ini` configuration file. These notifiers are called upon entries,
+  unhandled exceptions, and exits (via return or exception) of any function you 
+  have used the `@automation` decorator with.
 * `data_dir`: A `Path` object indicating the location where persistent data
   files for this automation should be stored.
 * `docs_dir`: A `Path` object indicating the location where this automation's
@@ -258,9 +266,9 @@ runtime environment:
   files should be located for this automation.
 
 
-## Configuration Files
+### Configuration Files
 
-### Configuration File Structure
+#### Configuration File Structure
 
 Attila configuration files are structured according to the commonly supported
 [INI file format](https://en.wikipedia.org/wiki/INI_file). INI files consist 
@@ -287,7 +295,7 @@ Example:
         # Comment
         Line 3
 
-### Configuration Hierarchy
+#### Configuration File Hierarchy
 
 Attila takes this organization one step further. Configuration files can be
 organized into default hierarchies, where requests for configuration settings
@@ -318,13 +326,13 @@ requested option or section. If none of the configurations defines the
 requested option or section, a `KeyError` will be raised.
 
 
-### Interpolation
+#### Interpolation
 
 Attila configuration files also support value interpolation of four different
 types: simple interpolation, date/time interpolation, path interpolation, and 
 object interpolation.
 
-#### Simple Interpolation
+##### Simple Interpolation
 
 *Simple interpolation* consists of direct value replacement. The syntax
 has two forms, `${option}`, and `${section:option}`. With the section name
@@ -336,7 +344,7 @@ injected into the text at the location where the simple interpolation
 appears. Multiple simple interpolations can appear within a single option's
 value.
 
-#### Date/Time Interpolation
+##### Date/Time Interpolation
 
 *Date/time interpolation* uses the date/time at which the option is first
 requested to interpolate a formatted date string into the option's value.
@@ -346,7 +354,7 @@ The `datetime` format must contain at least one percent sign, `%` or it will
 not be recognized as such. Date/time interpolation follows the same rules as
 simple interpolation regarding value injection.
 
-#### Path Interpolation
+##### Path Interpolation
 
 Unlike simple and date/time interpolation, *path interpolation* allows an
 option to return a `Path` object as its value, rather than a simple string.
@@ -355,7 +363,7 @@ Path interpolations require the appearance of a URL prefix, `scheme://`, where
 `file`. The URL prefix must appear at the beginning of the option's value, and 
 the URL must take up the entirety of the option's value.
 
-#### Object Interpolation
+##### Object Interpolation
 
 Like path interpolation, *object interpolation* allows a parameter to have a
 non-string value, and does not support string injection. The syntax for object
@@ -369,7 +377,7 @@ the same option's value is requested multiple times, the previously returned
 object will be returned again; a new object is not created for subsequent 
 requests.
 
-#### Object Loaders
+##### Object Loaders
 
 The section referenced by an object interpolation must contain a `Type`
 option. This `Type` option indicates the name of the *loader* that is used to 
@@ -386,7 +394,7 @@ they are used to load the options or sections that refer to them. Loaders can
 be registered at install-time via a plugin mechanism, or at run-time via the
 `@config_loader` decorator. To register a function or class via the plugin
 mechanism, your package should use the `attila.config_loader` entry point. 
-(See [this stack exchange question](
+(See [this StackOverflow question](
 https://stackoverflow.com/questions/774824/explain-python-entry-points)
 for an explanation of entry points.)
 
@@ -405,12 +413,69 @@ is specifically requested by name from the calling code when loading an option.
 If you do not implement `load_config_value`, your loader can only be used to
 load sections, not options.
 
+## Event Handling and Notifications
+
+Attila offers a built-in mechanism for configurable event notifications via a
+standardized interface, allowing file and database logging, emails, other 
+message types, and even arbitrary function calls to be swapped 
+interchangeably with no changes to the code. The standardized interface for 
+event notifications is the `Notifier` abstract base class. Attila provides 
+several predefined notifier types:
+
+* `CallbackNotifier` passes the arguments to an arbitrary Python callable 
+  instance, e.g. a function or method.
+* `CompositeNotifier` chains multiple notifiers together into a single notifier
+  instance.
+* `EmailNotifier` constructs and sends an email by interpolating arguments into
+  a template.
+* `FileNotifier` writes notifications to a file.
+* `LogNotifier` sends notifications to Python's built-in logging system.
+* `MutexNotifier` wraps another notifier and ensures calls are serialized in a
+   multi-threaded environment.
+* `NullNotifier` ignores all notifications.
+* `SQLNotifier` inserts or updates rows in a SQL table.
+
+Additional notifier types can be implemented by subclassing the `Notifier` 
+class. All of the notifier types that Attila provides are registered as 
+configuration loaders, meaning they can be configured via parameters and loaded 
+using the configuration manager.
+
 
 ## Tasks and Subtasks
 
-TODO: Explain how tasks & subtasks work, how they can be used to make
-      code more self-documenting, and how they interface with the
-      configuration files.
+Attila provides specialized context managers, `task` and `subtask`, which hook 
+into the notification system to allow the configuration of task status 
+reporting. Task and subtask contexts send notifications upon entry, exit, 
+error, and success/failure of the code appearing within their context. Each of
+these notification types is sent to a separately defined notifier determined by
+the configuration manager, allowing them to be ignored, redirected, or 
+otherwise modified in a way that is completely transparent to the source code.
+The task and subtask context managers are designed to not only simplify the
+configuration and management of task-related notifications, but to also serve
+the dual purpose of making code more self-documenting.
+
+Below is an example use case of the `task` context manager. Upon entering the
+`with` block, the `task_start_notifier`, determined by the configuration 
+manager, is called. If/when the task is explicitly marked as successful (or 
+failed), the `task_success_notifier` (or `task_failure_notifier`) is 
+immediately called. If an unhandled exception occurs before the task is marked 
+as successful or failed, it is automatically marked as failed. Regardless of
+whether the task was previously marked as successful or failed, an unhandled
+exception always results in a call to `task_error_notifier`. If the `with`
+block is exited without an unhandled exception, the task is marked as
+successful (unless it has already been marked successful or failed) and the
+`task_end_notifier` is then called.
+
+    with task("Confirming order.") as order_confirmation:
+        # Do required stuff.
+        if condition:
+            # Mark the task as successful:
+            order_confirmation.success("Order confirmed!")
+            # Do optional stuff.
+
+Subtasks work identically to tasks, except they have separately configured
+notifiers.
+
 
 ## Security
 
