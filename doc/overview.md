@@ -1,8 +1,8 @@
+# Attila
 
-# The Big Idea
+## Introduction
 
-
-## What is an "automation"?
+### What is an "automation"?
 
 Before going into what Attila is and does, it's important to understand 
 the programming paradigm it's intended for. Attila was built to 
@@ -30,7 +30,7 @@ software, an automation has to be smart enough to do its job all on its
 own, and can't fall back on the actions of a user to guide it towards 
 intelligent decisions.
 
-## What is Attila?
+### What is Attila?
 
 With the concept of automation programming defined, Attila's purpose
 becomes much easier to express: Attila is not only an automation 
@@ -48,8 +48,7 @@ parameter file configurations, securely storing and accessing system
 login credentials, interacting with other threads, processes, and 
 windows, and installing and updating automations.
 
-
-# Automation Environment
+### The Automation Environment
 
 Attila assumes a particular model of development: A single development 
 shop, operating in a privately controlled, multi-server environment, 
@@ -63,8 +62,7 @@ this instantly familiar.) It is assumed that if distinct shared
 configurations are required, then these will operate under distinct 
 system accounts.
 
-
-# Abstraction Layer
+### Abstract Interfaces
 
 Attila provides a layer of abstraction between the configuration of an
 automation and its high-level behavior. For example, the generation of a 
@@ -117,10 +115,6 @@ a MySQL database instead of a sqlite table, or log to a database instead
 of sending an email, only the _configuration file_ needs to change; the
 code itself is fully generic.
 
-
-# Getting Started
-
-
 ## Setting Up Attila
 
 ### Installation Requirements
@@ -135,7 +129,6 @@ have been installed, the Attila framework can be installed with
 to configure the automation environment. The individual automations are
 packaged and installed separately and should list Attila as a 
 dependency.
-
 
 ### The `.automation` Folder
 
@@ -168,7 +161,6 @@ The `.automation` folder typically resides in the user's "home" folder,
 denoted by `~` on linux systems and in Attila `Path` objects. On Windows 
 this is the `C:\Users\[UserName]` folder.
 
-
 ### Configuring Attila
 
 Topics to be covered in this section:
@@ -185,7 +177,6 @@ Topics to be covered in this section:
 TODO: Explain for new users and dev shops adopting Attila how to install 
       Attila and configure the automation environment.
 
-
 ## Writing Your First Automation
 
 Attila comes with a built-in automation package template, which you can
@@ -199,7 +190,6 @@ left for you to do is populate the parameters in the generated `.ini`
 file and fill in the actual logic in `main()`. Some of the behavior of
 the package generation mechanisms can be controlled through the
 `[Code Generation]` sections in `attila.ini` or `automation.ini`.
-
 
 ## Automation Configuration
 
@@ -265,7 +255,6 @@ TODO: Add information about the configuration options to each entry here.
 * `workspace`: A `Path` object indicating the location where temporary working
   files should be located for this automation.
 
-
 ### Configuration Files
 
 #### Configuration File Structure
@@ -324,7 +313,6 @@ configuration, and finally the general configuration to determine the value
 to return, stopping at the first configuration which exists and defines the
 requested option or section. If none of the configurations defines the
 requested option or section, a `KeyError` will be raised.
-
 
 #### Interpolation
 
@@ -440,7 +428,6 @@ class. All of the notifier types that Attila provides are registered as
 configuration loaders, meaning they can be configured via parameters and loaded 
 using the configuration manager.
 
-
 ## Tasks and Subtasks
 
 Attila provides specialized context managers, `task` and `subtask`, which hook 
@@ -476,25 +463,217 @@ successful (unless it has already been marked successful or failed) and the
 Subtasks work identically to tasks, except they have separately configured
 notifiers.
 
-
 ## Security
 
-TODO: Explain how passwords are managed securely, and how to properly
-      utilize the security submodule for password safety and secure
-      data storage.
+Attila provides security management functionality which is fully integrated
+with the configuration system. Support for encrypted password storage, both
+in the file system and in a remote database, is built in.
+
+### Password Database Configuration
+
+In order to use the password database integration, the `Password DB Connector`
+and `Master Password Path` options must be set in the `Security` section of the
+`automation.ini` configuration file. Here we have an example configuration 
+which utilizes an ADODB connection to a SQL Server instance using a trusted
+connection:
+
+    [Security]
+    Password DB Connector: @Password Database Connector
+    Master Password Path: ${Environment:Shared Data}/password.dat
+    
+    [Password Database Connector]
+    Type:     ADODBConnector
+    Server:   123.456.789.10
+    Database: SecurityDB
+    Driver:   SQL Server
+    Dialect:  T-SQL
+    Trusted:  True
+
+The master password, stored in a locally encrypted file, is used to encrypt
+and decrypt the passwords stored in the database. The database must contain
+a table named `AutomationPasswords` with the following fields:
+
+* `System`: A varchar field containing the name of the system or domain.
+* `UserName`: A varchar field containing the user name.
+* `Password`: A varchar or blob field wide enough to contain the password
+  plus the "salt" -- 2,048 random bytes encrypted along with the password to 
+  prevent cracking attempts.
+* `Valid`: A bit or Boolean field which indicates whether the password is
+  currently considered valid. This indicator can be cleared upon a failed login
+  attempt to prevent multiple attempts which might lock out the user.
+  
+### Credential Configuration
+
+Often your automations will need to connect to systems that require password
+authentication, particularly in the cases of database connections and remote 
+file systems. Attila provides the `Credential` configuration loader for 
+securely configuring domain/user/password triples. To help prevent accidental 
+security leaks, e.g. through accidental source control commits, all loaders 
+provided by Attila which utilize credentials only support passwords stored in 
+encrypted form. 
+
+#### URL Schemes
+ 
+URL schemes that permit embedded password authentication typically take the
+form, `scheme://user@password:domain`. The URL schemes implemented in Attila
+require the `@password` portion of these URLs to be omitted. When the `Path`
+is loaded from the configuration file, the appropriate password is
+automatically looked up in the password database, decrypted, and interpolated
+into the URL. The password should be stored in the database using the value 
+`domain/scheme` as the domain and `user` as the user name. For example, for
+the URL `sftp://greg@Pa$$w0rd/ftp.server`, the password should be stored using
+`ftp.server/sftp` as the domain and `greg` as the user name.
 
 ## Convenience Functions
 
-TODO: Go over the contents of attila.utility and attila.progress, and
-      the verify_type function.
+Attila provides several utility functions which are commonly useful in writing
+automations and help prevent code bloat. Most of the functions described below
+accept additional arguments to fine-tune their behavior. Check out their doc 
+strings for more detailed information.
+
+### attila.exceptions
+
+#### Functions 
+
+* `verify_type(obj, typ)`: Check that the object has the expected type. If not,
+  raise a `TypeError`.
+
+### attila.processes
+
+#### Functions
+
+* `process_exists(pid, name)`: Return a Boolean indicating whether a process 
+  exists.
+* `count_processes(pid, name)`: Count the number of active processes. If a 
+  process ID or process name is provided, count only processes that match the 
+  requirements.
+* `get_pids(name)`: Return a list of process IDs of active processes with the
+  given name.
+* `get_name(pid)`: Return the name of the process if it exists, or the default 
+  otherwise.
+* `get_command_line(pid)`: Return the command line of the process.
+* `get_parent_pid(pid)`: Return the process ID of the parent process.
+* `get_child_pids(pid)`: Return the process IDs of the child processes in a 
+   list.
+* `kill_process(pid)`: Kill a specific process.
+* `kill_process_family(pid)`: Kill a specific process and all descendant 
+   processes.
+* `capture_process(command)`: Call the command and capture its return value. 
+  Watch for a unique process to be created by the command, and capture its PID. 
+  If a unique new process could not be identified, raise an exception. This is
+  useful for ensuring process cleanup for commands that generate new processes
+  in unreliable environments, particularly COM automation.
+
+### attila.progress
+
+#### Functions
+
+* `progress(iterable)`: Automatically log the progress made through an iterable
+  sequence. This is useful for long-running `for` loops; just wrap the sequence
+  you're iterating over in a call to the `progress` function to log the `for` 
+  loop's progress.
+
+### attila.strings
+
+#### Functions
+
+* `get_type_name(type_obj)`: Get the name of a type.
+* `parse_bool(string)`: Parse a `bool` from a string.
+* `parse_char(string)`: Parse a single character from a string. The string can 
+  be anything that would be interpreted as a character within a string literal, 
+  i.e. the letter a or the escape sequence \t, or it can be an integer ordinal 
+  representing a character. If an actual digit character is desired, it must be 
+  quoted in the string value.
+* `parse_int(string)`: Parse an integer from a string.
+* `parse_number(string)`: Parse a number from a string. Returns either an 
+  integer or a float.
+* `format_currency(amount)`: Format a decimal amount as a dollar amount string.
+* `format_ordinal(number)`: Given an integer, return the corresponding ordinal 
+  ('1st', '2nd', etc.).
+* `glob_to_regex(pattern)`: Convert a glob-style pattern (e.g. `*.txt`)to a 
+  compiled regular expression.
+* `glob_match(pattern, string)`: Return a Boolean indicating whether the string 
+  is matched by the glob-style pattern.
+* `format_english_list(items)`: Make an English-style list (e.g. "a, b, and c") 
+  from a list of items.
+* `date_mask_to_format(mask)`: Convert a date mask (e.g. `YYYY-MM-DD`) to a 
+  date format (e.g. `%Y-%m-%d`).
+* `parse_datetime(string)`: Parse a date/time string, returning a 
+  `datetime.datetime` instance.
+* `parse_date(string)`: Parse a date string, returning a `datetime.date` 
+  instance.
+* `parse_timedelta(string)`: Parse a timedelta from a string.
+* `split_port(ip_port)`: Split an IP:port pair.
+* `parse_log_level(string)`: Parse a log level, e.g. INFO, WARNING, etc.
+* `to_list_of_strings(items)`: Parse a delimited string into a list of 
+  non-empty strings.
+* `to_list_of_lines(string)`: Parse a newline-delimited string into a list of
+  non-empty strings.
+
+#### Classes
+
+* `DateTimeParser`: A generic parser for date/time strings.
+* `USDateTimeParser`: A generic parser for date/time values expressed in common 
+  formats used in the US.
+
+### attila.threads
+
+#### Functions
+
+* `async(function, *args, **kwargs)`: Call a function asynchronously. The 
+  function runs in a separate background thread while the current execution
+  flow continues uninterrupted. The returned object can be checked to find
+  out when the called function has returned and what its return value was, or
+  joined like an ordinary thread.
+
+#### Context Managers
+
+* `mutex(name)`: Hold a mutex (a unique, system-wide, named resource lock) 
+  while executing a block of code. Only one process or thread can hold a
+  given mutex at a time. If another process or thread tries to acquire the
+  mutex, it will wait for the one already holding it to release it first. This
+  is an easy way to ensure that a particular resource (often a file) is only
+  accessed by one process or thread at a time, to avoid race conditions.
+* `semaphore(name, max_count)`: Hold a semaphore (a system-wide named resource
+  counter) while executing a block of code. A semaphore is just like a mutex,
+  except that up to `max_count` processes or threads can hold the semaphore at
+  one time.
+
+### attila.utility
+
+#### Functions
+
+* `first(items)`: Return the first item from a sequence. If the item sequence 
+  does not contain at least one value, raise an exception.
+* `last(items)`: Return the last item from a sequence. If the item sequence 
+  does not contain at least one value, raise an exception.
+* `only(items)`: Return the only item from a sequence. If the item sequence 
+  does not contain exactly one value, raise an exception.
+* `distinct(items)`: Return a list of the items in the same order as they first 
+  appear, except that later duplicates of the same value are removed. Items in 
+  the sequence must be hashable, or, if a key is provided, the return values of 
+  the key must be hashable.
+* `wait_for(condition)`: Repeatedly sleep until the condition (a lambda 
+  expression or function which accepts zero arguments) returns `True`.
+* `wait_for_keypress()`: Wait until the user presses a key on the keyboard.
+
+#### Decorators
+
+* `@once`: The function this decorator is applied to becomes callable only 
+  once. Subsequent calls to the function return the same value as the original
+  call, regardless of the argument values provided.
+
+### attila.windows
+
+#### Functions
+
+* `set_title(title)`: Set the title for the console window of the script.
+* `window_exists(title)`: Return a Boolean value indicating whether a window 
+  with the given title exists.
+* `force_close_windows(title_pattern)`: Force-close all windows with a title 
+  matching the provided pattern.
 
 ## Packaging and Installation
 
 TODO: Go over how to package and distribute Attila automations, and the
       special functionality provided in attila.installation.
-
-
-# Structure of the Attila Codebase
-
-TODO: Go over the structure of the library - how things are arranged and
-      why, and where to find what you're looking for.
