@@ -10,6 +10,11 @@ Password storage and retrieval.
 
 # TODO: Make the table name, field names, and salt size configurable.
 
+# TODO: Make the get_password function check for locally encrypted passwords first, 
+#       before attempting to query the database. Add an option to the set_password
+#       function to allow the user to control whether the password is set locally 
+#       or in the database.
+
 
 import base64
 import getpass
