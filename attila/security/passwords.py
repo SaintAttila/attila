@@ -8,6 +8,9 @@ Password storage and retrieval.
 #       works universally? Something in the config files?
 
 
+# TODO: Make the table name, field names, and salt size configurable.
+
+
 import base64
 import getpass
 import os
