@@ -14,6 +14,10 @@ from ..plugins import config_loader
 from . import encryption, passwords
 
 
+# TODO: Allow passwords to be stored in encrypted form in the INI file, rather than only in the password database or
+#       separately encrypted .dat files.
+
+
 __author__ = 'Aaron Hosford'
 __all__ = [
     'Credential',
