@@ -59,6 +59,9 @@ class Notifier(metaclass=ABCMeta):
             # It's important that this never fails because it's used to report errors.
             return template + ' (args: %r, kwargs: %r)' % (args, kwargs)
 
+    # TODO: Normalize this interface. It should take an optional message, then *args and **kwargs used for 
+    #       interpolation, and finally a keyword ony optional attachments list. All subclasses and their uses will also
+    #       have to be updated.
     @abstractmethod
     def __call__(self, *args, attachments=None, **kwargs):
         """
