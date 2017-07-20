@@ -2,6 +2,8 @@
 .idea/
 doc/sphinx/
 doc/attila.html
+doc/attila.pdf
+
 
 # Ignore backup copies of old files.
 bak/
