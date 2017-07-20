@@ -1651,7 +1651,7 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
                 #       because it's also the destination file.
                 if str(abs(Path(path, self))) == str(destination):
                     # We can't overwrite the file with itself.
-                    raise FileExistsError(destination)
+                    raise FileExistsError("Attempting to overwrite file with itself: %s" % destination)
 
                 # It's not a folder, and it's in our way.
                 if not overwrite:
