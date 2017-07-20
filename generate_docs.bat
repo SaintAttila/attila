@@ -11,3 +11,5 @@ python -c "import os; os.system('make html')"
 
 cd ..\..
 start doc/sphinx/_build/html/index.html
+
+pandoc -f markdown -t html doc/attila.md -o doc/attila.html
