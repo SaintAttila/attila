@@ -62,6 +62,10 @@ class connection(metaclass=ABCMeta):
         """Whether the instance is currently open."""
         return self._is_open
 
+    @property
+    def connector(self) -> Connector:
+        return self._connector
+
     @abstractmethod
     def open(self):
         """Open the connection."""
