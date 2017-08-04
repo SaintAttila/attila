@@ -205,8 +205,7 @@ class ADODBConnector(sql.SQLConnector, configurations.Configurable):
             user = parameter_map.get('uid')
             if user is not None:
                 credential_string = user + '@' + server + '/adodb'
-                credential = \
-                    manager.load_value(credential_string, credentials.Credential)
+                credential = manager.load_value(credential_string, credentials.Credential)
             else:
                 credential = None
 
@@ -342,7 +341,7 @@ class ADODBConnector(sql.SQLConnector, configurations.Configurable):
             user, password = self._credential[:2]
             result += ";Uid={%s};Pwd={%s}" % (user, password)
         if self._trusted is not None:
-            result += ";Trusted_Connection=%s" % repr(self._trusted)
+            result += ";Trusted_Connection=%s" % ('yes' if self._trusted else 'no')
         if self.dialect is not None:
             result += ";Dialect={%s}" % self.dialect
         return result
