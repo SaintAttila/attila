@@ -2,9 +2,9 @@
 HTTP file system support
 """
 
-import ctypes
-
 from urllib.parse import urlparse
+
+import requests
 
 from ..abc.files import FSConnector, fs_connection
 from ..abc.files import Path
@@ -19,6 +19,9 @@ __all__ = [
     'HTTPFSConnector',
     'http_fs_connection',
 ]
+
+
+DEFAULT_HTTP_PORT = 80
 
 
 @config_loader
@@ -120,24 +123,10 @@ class http_fs_connection(fs_connection):
         # create a temp file and return it as a proxy.
         temp_path = local_fs_connection.get_temp_file_path(self.name(path))
 
-        # TODO: Can we just use a GET?
-        # http://msdn.microsoft.com/en-us/library/ie/ms775123(v=vs.85).aspx
-        result = ctypes.windll.urlmon.URLDownloadToFileW(0, path, str(temp_path), 0, 0)
-
-        if result == 1:
-            raise MemoryError(
-                "Insufficient memory available to download " + path + ". (Return code 1)"
-            )
-        elif result != 0:
-            raise RuntimeError(
-                "Unspecified error while trying to download " + path + ". (Return code " +
-                str(result) + ")"
-            )
-        elif not temp_path.is_file:
-            raise FileNotFoundError(
-                "File appeared to download successfully from " + path +
-                " but could not be found afterward."
-            )
+        response = requests.get(path)
+        response.raise_for_status()
+        with open(temp_path, 'wb') as temp_file:
+            temp_file.writelines(response.iter_content())
 
         return ProxyFile(Path(path, self), mode, buffering, encoding, errors, newline, closefd,
                          opener, proxy_path=temp_path, writeback=None)
