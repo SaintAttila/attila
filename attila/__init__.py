@@ -7,7 +7,7 @@ from . import abc, db, fs, notifications, security
 from . import configurations, context, exceptions, plugins, strings
 
 
-__version__ = '1.10.5'
+__version__ = '1.11'
 
 __author__ = 'Aaron Hosford'
 __author_email__ = 'Aaron.Hosford@Ericsson.com'
@@ -18,6 +18,7 @@ __install_requires__ = [
     # 3rd-party
     'cryptography',
     'pywin32',
+    'requests',
     'setuptools',
     'wmi',
 
