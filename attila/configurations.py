@@ -75,9 +75,9 @@ def load_global_value(name):
     # We may need to import some modules to access the function.
     pieces = name.split('.')
     for index in range(1, len(pieces)):
-        name = '.'.join(pieces[:index])
+        parent_name = '.'.join(pieces[:index])
         try:
-            local_symbols[name] = __import__(name, global_symbols, local_symbols)
+            local_symbols[parent_name] = __import__(parent_name, global_symbols, local_symbols)
         except ImportError:
             break
 
