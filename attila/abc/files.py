@@ -1311,7 +1311,7 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
         :param path: The path to operate on.
         :return: The name, minus any extension.
         """
-        return os.path.splitext(os.path.basename(self.check_path(path)))[0]
+        return os.path.splitext(self.name(path))[0]
 
     def extension(self, path):
         """
@@ -1635,11 +1635,13 @@ class fs_connection(connection, Configurable, metaclass=ABCMeta):
         # flag only applies to the copied file object and its descendants.
         destination.dir.make_dir(overwrite, clear=False, fill=fill, check_only=check_only)
 
-        if self.is_dir(path):
+        is_dir = self.is_dir(path)
+
+        if is_dir:
             destination.make_dir(overwrite, clear, fill, check_only)
             for child in self.glob(path):
                 child.copy_into(destination, overwrite, clear, fill, check_only)
-        else:
+        if not is_dir or self.is_file(path):  # It's possible for it to be both.
             self.verify_is_file(path)
 
             if destination.exists:
