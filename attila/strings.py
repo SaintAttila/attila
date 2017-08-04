@@ -244,8 +244,7 @@ def glob_to_regex(pattern, case_sensitive=False, wildcard='*'):
     assert wildcard
 
     flags = (0 if case_sensitive else re.IGNORECASE)
-    return re.compile('^' + '.*'.join(re.escape(piece) for piece in pattern.split(wildcard)) + '$',
-                      flags)
+    return re.compile('^' + '.*'.join(re.escape(piece) for piece in pattern.split(wildcard)) + '$', flags)
 
 
 def glob_match(pattern, string, case_sensitive=False, wildcard='*'):
