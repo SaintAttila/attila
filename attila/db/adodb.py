@@ -155,7 +155,7 @@ class ADODBConnector(sql.SQLConnector, configurations.Configurable):
                 assert not equals and value is None
                 key = token
             else:
-                assert key and equals and value
+                assert key and equals and value is None
                 value = token
         if key is not None:
             assert key and equals and value
