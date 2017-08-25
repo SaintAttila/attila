@@ -7,7 +7,7 @@ from . import abc, db, fs, notifications, security
 from . import configurations, context, exceptions, plugins, strings
 
 
-__version__ = '1.11.1'
+__version__ = '1.11.2'
 
 __author__ = 'Aaron Hosford'
 __author_email__ = 'Aaron.Hosford@Ericsson.com'
