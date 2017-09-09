@@ -10,7 +10,7 @@ from . import configurations, context, exceptions, plugins, strings
 __version__ = '1.11.2'
 
 __author__ = 'Aaron Hosford'
-__author_email__ = 'Aaron.Hosford@Ericsson.com'
+__author_email__ = 'hosford42@gmail.com'
 __description__ = 'Attila: A Python Automation Framework'
 __long_description__ = __doc__
 __license__ = 'MIT (https://opensource.org/licenses/MIT)'
